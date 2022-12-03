@@ -57,3 +57,11 @@ CREATE TABLE active_riddles (
     FOREIGN KEY (user_id) REFERENCES users (id),
     FOREIGN KEY (riddle_id) REFERENCES riddles (id)
 );
+CREATE TABLE winners (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_state_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+
+    FOREIGN KEY (game_state_id) REFERENCES game_states (id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);

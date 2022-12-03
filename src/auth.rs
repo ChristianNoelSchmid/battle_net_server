@@ -10,13 +10,18 @@ use rocket::{
 };
 use sqlite::Value;
 
-use crate::{query, sqlite::db};
+use crate::{
+    jwt::{generate_access_token, verify_token},
+    query,
+    sqlite::db,
+};
 
 lazy_static! {
     static ref SECRET_RE: Regex =
         Regex::new(r"(?P<username>[a-zA-Z]+);(?P<passwd>[a-zA-Z]+)").unwrap();
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct AuthUser(pub i64);
 
 #[derive(Debug)]
@@ -32,8 +37,8 @@ impl<'r> FromRequest<'r> for AuthUser {
         if let Some(Ok(username)) = req.query_value::<String>("user_name") {
             if let Some(Ok(test_passwd)) = req.query_value::<String>("passwd") {
                 if let Some(id) = credentials_match(&username, &test_passwd) {
-                    let secret = format!("{};{}", username, test_passwd);
-                    let cookie = Cookie::build("secret", secret)
+                    let token = generate_access_token(id);
+                    let cookie = Cookie::build("accessToken", token)
                         .path("/")
                         .secure(!cfg!(debug_assertions))
                         .http_only(!cfg!(debug_assertions))
@@ -47,15 +52,9 @@ impl<'r> FromRequest<'r> for AuthUser {
         }
 
         // Next, try to get the credentials from the request cookie (if it exists)
-        if let Some(secret) = req.cookies().get("secret") {
-            let mut split = secret.value().split(';');
-
-            if let Some(username) = split.next() {
-                if let Some(passwd) = split.next() {
-                    if let Some(id) = credentials_match(username, passwd) {
-                        return Outcome::Success(AuthUser(id));
-                    }
-                }
+        if let Some(secret) = req.cookies().get("accessToken") {
+            if let Some(id) = verify_token(secret.value()) {
+                return Outcome::Success(AuthUser(id));
             }
         }
 
