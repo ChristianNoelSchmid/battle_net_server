@@ -1,10 +1,7 @@
-use std::env;
-
 use lazy_static::lazy_static;
 
 use regex::Regex;
 use rocket::{
-    config::Config,
     http::{Cookie, Status},
     request::{FromRequest, Outcome},
 };
