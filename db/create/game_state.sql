@@ -1,17 +1,21 @@
+/* All users in the given game */
 CREATE TABLE users (
     id             INTEGER  PRIMARY KEY  AUTOINCREMENT,
     card_id        INTEGER  NOT NULL,
     user_name      TEXT     NOT NULL, 
     passwd         TEXT     NOT NULL,
-
     user_img_path  TEXT,
+    last_login     DATETIME DEFAULT NOW(),
+
     FOREIGN KEY (card_id) REFERENCES cards(id)
 );
+/* All card categories for the game running in the database */
 CREATE TABLE categories (
     id        INTEGER  PRIMARY KEY  AUTOINCREMENT, 
     cat_name  TEXT     NOT NULL
 );
-CREATE TABLE cards (
+/* All evidence cards for the game running in the database */
+CREATE TABLE evidence_cards (
     id             INTEGER  PRIMARY KEY AUTOINCREMENT,
     cat_id         INT      NOT NULL,
     item_name      TEXT     NOT NULL,
@@ -19,7 +23,9 @@ CREATE TABLE cards (
 
     FOREIGN KEY (cat_id) REFERENCES categories(id)
 );
-CREATE TABLE user_found_cards (
+/* All evidence cards individual users have discovered,
+   or are marking as potential */
+CREATE TABLE user_evidence_cards (
     user_id    INT      NOT NULL,
     card_id    INT      NOT NULL,
     confirmed  BOOLEAN,
@@ -28,35 +34,14 @@ CREATE TABLE user_found_cards (
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (card_id) REFERENCES cards(id)
 );
-CREATE TABLE game_states (
-    id                INTEGER  PRIMARY KEY AUTOINCREMENT,
+/* The game state - a singleton table */
+CREATE TABLE game_state (
     murdered_user_id  INTEGER  NOT NULL,
+    game_target_cards TEXT NOT NULL,
     
     FOREIGN KEY (murdered_user_id) REFERENCES users(id)
 );
-
-CREATE TABLE game_target_cards (
-    game_state_id  INTEGER NOT NULL,
-    card_id        INTEGER NOT NULL,
-
-    PRIMARY KEY (game_state_id, card_id),
-    FOREIGN KEY (game_state_id) REFERENCES game_states(id),
-    FOREIGN KEY (card_id) REFERENCES cards(id)
-);
-CREATE TABLE riddles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    text TEXT NOT NULL,
-    answers TEXT NOT NULL
-);
-CREATE TABLE active_riddles (
-    user_id INTEGER NOT NULL,
-    riddle_id INTEGER NOT NULL,
-    answered BOOLEAN NOT NULL DEFAULT FALSE,
-
-    PRIMARY KEY (user_id, riddle_id), 
-    FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (riddle_id) REFERENCES riddles (id)
-);
+/* All users who have won the game */
 CREATE TABLE winners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_state_id INTEGER NOT NULL,

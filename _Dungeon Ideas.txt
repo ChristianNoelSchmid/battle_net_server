@@ -1,0 +1,25 @@
+Central theme - there is an ominous door you have to walk through. This triggers a randomized event-based quest, where you have to correctly traverse an obstacle in a dungeon to eventually get an evidence card.
+
+If a player fails the quest, they get thrown out of the dungeon. Whether successful or failure, the player must wait a certain amount of time to enter the dungeon again.
+
+Upon succeeding the event, the player has the option to... 
+    1) Go get their evidence card and leave the dungeon
+
+    2) Go further down the dungeon and attempt to get a sabatogue card. This will trigger a harder event that the player must succeed in. 
+        If they succeed they get both the evidence card and a sabatogue card, which they can play on other players for some benefit.
+        If they fail, they themselves will be sabatogued (some ill effect will happen to them) and be thrown out of the dungeon. 
+
+Players can also randomly find items in the dungeon, which they can use for various purposes. Examples include
+    - A de-obfustigation mirror, which reveals the first letter of an answer in a riddle.
+    - A sword, which can be used to fight monsters.
+    - A sleuthy card, which allows one to bypass certain types of monsters.
+ 
+Players also have unique traits which they can use in their journeys.
+
+- Kunane: boxing gloves - daze an enemy for one turn
+- MJ: witty retort - deals emotional damage to an enemy (free action)
+- Miranda: twin-mom endurance - damage can be removed once per battle
+- Alyssa C.: adorable baby - Hazel distracts monster with cuteness for one turn per battle
+- Brian: twin-dad energy - attack deals double damage once per battle
+- Alyssa Q.: control vines and moss - vines twist twist around the enemy, and moss trips them. Lowers enemy accuracy
+- 
