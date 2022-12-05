@@ -35,7 +35,7 @@ impl Model for EvidenceCard {
         EvidenceCard {
             card_id: row.get("id"),
             item_name: row.get("item_name"),
-            item_img_path: row.get("item_img_path")
+            item_img_path: row.get("item_img_path"),
         }
     }
 }
@@ -44,18 +44,16 @@ impl Model for EvidenceCard {
 pub struct UserState {
     pub confirmed_card_ids: Vec<i64>,
     pub unconfirmed_card_ids: Vec<i64>,
-    pub current_riddle: Option<(i64, String)>,
 }
 
 #[derive(Serialize)]
 pub struct GameInitialState {
     pub target_cards: Vec<(i64, String)>,
-    pub murdered_user: (i64, String),
+    pub murdered_user: User,
 }
 
 #[derive(Serialize)]
 pub struct GameState {
-    pub game_state_id: i64,
     pub murdered_user: User,
     pub categories: Vec<(i64, String)>,
     pub cards: Vec<EvidenceCard>,

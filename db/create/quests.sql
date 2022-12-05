@@ -6,9 +6,11 @@ CREATE TABLE riddles (
 );
 /* All possible monsters in the game */
 CREATE TABLE monsters (
-    id INTEGER PRIMARY KEY AUTOINCREMENT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    base_damage INTEGER NOT NULL,
+    base_health INTEGER NOT NULL,
+    base_flee_chance INTEGER NOT NULL
 );
-
 
 /* All quests, run by individual users */
 CREATE TABLE quests (

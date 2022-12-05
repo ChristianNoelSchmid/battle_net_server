@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate rocket;
-use christmas_2022::{controllers::{game_state_controller, quest_controller}, cors::Cors};
-use rocket::fs::{FileServer, relative};
+use christmas_2022::{
+    controllers::{game_controller, quest_controller, user_controller},
+    cors::Cors,
+};
+use rocket::fs::{relative, FileServer};
 
 #[launch]
 fn rocket() -> _ {
@@ -11,8 +14,9 @@ fn rocket() -> _ {
         .attach(Cors);
 
     // Apply all the routes from controllers
-    rckt = game_state_controller::routes(rckt);
+    rckt = game_controller::routes(rckt);
     rckt = quest_controller::routes(rckt);
+    rckt = user_controller::routes(rckt);
 
     rckt
 }

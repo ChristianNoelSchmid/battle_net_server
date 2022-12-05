@@ -1,13 +1,16 @@
-use rocket::{Build, Rocket, post, serde::json::Json, http::Status, routes};
+use rocket::{http::Status, post, routes, serde::json::Json, Build, Rocket};
 use sqlite::Value;
 
-use crate::{execute, sqlite::db, models::{PostRiddle, RiddleProgress, EvidenceCard, Riddle}, auth::AuthUser, query};
+use crate::{
+    auth::AuthUser,
+    execute,
+    models::{EvidenceCard, PostRiddle, Riddle, RiddleProgress},
+    query,
+    sqlite::db,
+};
 
 pub fn routes(rocket: Rocket<Build>) -> Rocket<Build> {
-    let rocket = rocket.mount(
-        "/quests",
-        routes![post_new_riddle, post_guess_riddle]
-    );
+    let rocket = rocket.mount("/quests", routes![post_new_riddle, post_guess_riddle]);
     rocket
 }
 
@@ -26,8 +29,11 @@ fn post_new_riddle(riddle: Json<PostRiddle>) -> Status {
 }
 
 #[post("/guess-riddle/<riddle_id>/<answer>")]
-fn post_guess_riddle(riddle_id: i64, answer: String, user: AuthUser)
-    -> Result<Json<RiddleProgress>, Status> {
+fn post_guess_riddle(
+    riddle_id: i64,
+    answer: String,
+    user: AuthUser,
+) -> Result<Json<RiddleProgress>, Status> {
     let db = db();
     // Retrieve the riddle
     let mut riddle = query!(
