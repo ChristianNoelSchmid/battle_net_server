@@ -164,6 +164,7 @@ dependencies = [
  "jwt",
  "lazy_static",
  "mockall",
+ "rand",
  "regex",
  "rocket",
  "serde",

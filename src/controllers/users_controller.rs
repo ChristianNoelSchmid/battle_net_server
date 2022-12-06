@@ -2,9 +2,8 @@ use rocket::{get, post, routes, serde::json::Json, Build, Rocket};
 
 use crate::{
     auth::AuthUser,
-    db_services::user_db_service::{all_users, update_evidence_card, user_evidence_cards},
-    models::{User, UserState},
-    sqlite::db,
+    db_services::user_db_services::{all_users, update_evidence_card, user_evidence_cards},
+    sqlite::db, models::users::{User, UserState},
 };
 
 pub fn routes(rocket: Rocket<Build>) -> Rocket<Build> {

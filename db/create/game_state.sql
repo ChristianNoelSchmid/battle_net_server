@@ -5,7 +5,7 @@ CREATE TABLE users (
     user_name      TEXT     NOT NULL, 
     passwd         TEXT     NOT NULL,
     user_img_path  TEXT,
-    last_login     DATETIME DEFAULT NOW(),
+    last_login     DATETIME DEFAULT NOW,
 
     FOREIGN KEY (card_id) REFERENCES cards(id)
 );
@@ -37,16 +37,17 @@ CREATE TABLE user_evidence_cards (
 /* The game state - a singleton table */
 CREATE TABLE game_state (
     murdered_user_id  INTEGER  NOT NULL,
-    game_target_cards TEXT NOT NULL,
-    
     FOREIGN KEY (murdered_user_id) REFERENCES users(id)
+);
+/* The target cards for the game */
+CREATE TABLE game_target_cards (
+    card_id INTEGER NOT NULL,
+    FOREIGN KEY (card_id) REFERENCES evidence_cards(id)
 );
 /* All users who have won the game */
 CREATE TABLE winners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    game_state_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
 
-    FOREIGN KEY (game_state_id) REFERENCES game_states (id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );

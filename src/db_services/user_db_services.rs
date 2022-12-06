@@ -3,8 +3,7 @@ use sqlite::{Connection, Value};
 use crate::{
     auth::AuthUser,
     execute,
-    models::{Model, User},
-    query,
+    query, models::{users::User, model::Model},
 };
 
 pub fn all_users(db: &Connection) -> Vec<User> {
@@ -32,7 +31,7 @@ pub fn user_evidence_cards(db: &Connection, user: AuthUser) -> Vec<(i64, bool)> 
 pub fn update_evidence_card(db: &Connection, user: AuthUser, card_id: i64) {
     let mut card = query!(
         db,
-        r"SELECT confirmed FROM user_found_cards WHERE user_id = ? AND card_id = ?",
+        r"SELECT confirmed FROM user_evidence_cards WHERE user_id = ? AND card_id = ?",
         Value::Integer(user.0),
         Value::Integer(card_id)
     );
@@ -40,7 +39,7 @@ pub fn update_evidence_card(db: &Connection, user: AuthUser, card_id: i64) {
         if card.get::<i64, &str>("confirmed") == 0 {
             execute!(
                 db,
-                "DELETE FROM user_found_cards WHERE user_id = ? and card_id = ?",
+                "DELETE FROM user_evidence_cards WHERE user_id = ? and card_id = ?",
                 Value::Integer(user.0),
                 Value::Integer(card_id)
             );
@@ -48,7 +47,7 @@ pub fn update_evidence_card(db: &Connection, user: AuthUser, card_id: i64) {
     } else {
         execute!(
             db,
-            r"INSERT INTO user_found_cards (user_id, card_id, confirmed)
+            r"INSERT INTO user_evidence_cards (user_id, card_id, confirmed)
               VALUES (?, ?, false)",
             Value::Integer(user.0),
             Value::Integer(card_id)

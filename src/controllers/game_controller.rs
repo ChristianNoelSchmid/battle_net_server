@@ -1,31 +1,23 @@
 use rocket::{
     get,
-    http::Status,
     post,
     response::status::{self, BadRequest},
     routes,
     serde::json::Json,
     Build, Rocket,
 };
-use sqlite::Value;
 
 use crate::{
     auth::AuthUser,
-    db_services::game_db_service::{all_evidence_cards, game_state, setup_game},
-    execute,
-    models::{EvidenceCard, GameInitialState, GameState, User, UserState},
-    query,
-    sqlite::db,
+    db_services::game_db_services::{game_state, setup_game, guess_target_cards},
+    sqlite::db, models::game::{GameInitialState, GameState},
 };
-
-const DEFAULT_GAME_INDEX: i64 = 1;
 
 pub fn routes(rocket: Rocket<Build>) -> Rocket<Build> {
     let rocket = rocket.mount(
         "/game",
         routes![
             get_game_state,
-            get_all_evidence_cards,
             post_setup_game,
             post_guess_target_cards
         ],
@@ -42,12 +34,6 @@ fn post_setup_game(_user: AuthUser) -> Result<Json<GameInitialState>, status::Ba
     }
 }
 
-#[get("/all-cards")]
-fn get_all_evidence_cards(_user: AuthUser) -> Json<Vec<EvidenceCard>> {
-    let db = db();
-    Json(all_evidence_cards(&db))
-}
-
 #[get("/state")]
 fn get_game_state(user: AuthUser) -> Result<Json<GameState>, status::BadRequest<String>> {
     let db = db();
@@ -60,32 +46,7 @@ fn get_game_state(user: AuthUser) -> Result<Json<GameState>, status::BadRequest<
 }
 
 #[post("/guess-target-cards", format = "json", data = "<guess>")]
-fn post_guess_target_cards(guess: Json<Vec<i64>>, user: AuthUser) -> Status {
+fn post_guess_target_cards(guess: Json<Vec<i64>>, user: AuthUser) -> Json<bool> {
     let db = db();
-    let target_ids = query!(
-        db,
-        r"
-            SELECT card_id FROM game_target_cards
-            WHERE game_state_id = ?
-        ",
-        Value::Integer(DEFAULT_GAME_INDEX)
-    )
-    .map(|row| row.get("card_id"))
-    .collect::<Vec<i64>>();
-
-    if guess.0.len() != target_ids.len() {
-        return Status::BadRequest;
-    }
-    for guess_id in guess.0 {
-        if !target_ids.contains(&guess_id) {
-            return Status::BadRequest;
-        }
-    }
-    execute!(
-        db,
-        r"INSERT INTO winners (game_state_id, user_id) VALUES (?, ?)",
-        Value::Integer(DEFAULT_GAME_INDEX),
-        Value::Integer(user.0)
-    );
-    Status::Ok
+    Json(guess_target_cards(&db, &guess, user))
 }

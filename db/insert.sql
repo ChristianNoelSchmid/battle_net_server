@@ -1,4 +1,4 @@
-INSERT INTO cards (cat_id, item_name)
+INSERT INTO evidence_cards (cat_id, item_name)
 VALUES 
     (1, "Elf"), 
     (1, "The Polar Express"), 
