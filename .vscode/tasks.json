@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Reset Database",
+            "command": "rm ./app.db; cat ./db/**/*.sql | sqlite3 app.db",
+            "type": "shell",
+            "presentation": {
+                "reveal": "never",
+            },
+            "args": [],
+            "group": "build"
+        },
+        {
+            "label": "Watch Server",
+            "command": "cargo",
+            "type": "shell",
+            "args": ["watch", "-x", "run"],
+            "group": "build"
+        }
+    ]
+}

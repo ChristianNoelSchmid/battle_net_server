@@ -1,16 +1,6 @@
 use sqlite::{Connection, Value};
 
-use crate::{
-    auth::AuthUser,
-    execute,
-    query, models::{users::User, model::Model},
-};
-
-pub fn all_users(db: &Connection) -> Vec<User> {
-    query!(db, "SELECT * from users")
-        .map(|row| User::from_row(row))
-        .collect()
-}
+use crate::{execute, middleware::auth::AuthUser, query};
 
 ///
 /// Returns a list of the user's currently active evidence

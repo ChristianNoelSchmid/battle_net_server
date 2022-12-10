@@ -13,11 +13,6 @@ use crate::{
     sqlite::db,
 };
 
-lazy_static! {
-    static ref SECRET_RE: Regex =
-        Regex::new(r"(?P<username>[a-zA-Z]+);(?P<passwd>[a-zA-Z]+)").unwrap();
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct AuthUser(pub i64);
 
@@ -31,7 +26,7 @@ impl<'r> FromRequest<'r> for AuthUser {
     async fn from_request(req: &'r rocket::Request<'_>) -> Outcome<Self, Self::Error> {
         // Attempt to log in by reading the username and password
         // from the request query parameters
-        if let Some(Ok(username)) = req.query_value::<String>("user_name") {
+        if let Some(Ok(username)) = req.query_value::<String>("username") {
             if let Some(Ok(test_passwd)) = req.query_value::<String>("passwd") {
                 if let Some(id) = credentials_match(&username, &test_passwd) {
                     let token = generate_access_token(id);
@@ -65,7 +60,7 @@ fn credentials_match(username: &str, test_passwd: &str) -> Option<i64> {
     // Try to get the user corresponding to the params
     let mut rows = query!(
         db,
-        "SELECT id, passwd FROM users WHERE user_name = ?",
+        "SELECT id, passwd FROM users WHERE username = ?",
         Value::String(username.to_string())
     );
 

@@ -1,36 +1,17 @@
 use serde::Serialize;
-use sqlite::Row;
 
-use super::{users::User, model::Model};
+use crate::resources::game_resources::{EvidenceCard, EvidenceCardCategories};
 
 #[derive(Serialize)]
 pub struct GameInitialState {
-    pub target_card_ids: Vec<i64>,
-    pub murdered_user: User,
+    pub target_card_idxs: Vec<i64>,
+    pub murdered_user_id: i64,
 }
 
 #[derive(Serialize)]
-pub struct GameState {
-    pub murdered_user: User,
-    pub categories: Vec<(i64, String)>,
-    pub cards: Vec<EvidenceCard>,
-    pub target_cards: Option<Vec<EvidenceCard>>,
-    pub winners: Option<Vec<User>>,
-}
-
-#[derive(Serialize, Clone)]
-pub struct EvidenceCard {
-    pub card_id: i64,
-    pub item_name: String,
-    pub item_img_path: Option<String>,
-}
-
-impl Model for EvidenceCard {
-    fn from_row(row: Row) -> Self {
-        EvidenceCard {
-            card_id: row.get("id"),
-            item_name: row.get("item_name"),
-            item_img_path: row.get("item_img_path"),
-        }
-    }
+pub struct GameState<'a> {
+    pub murdered_user_idx: i64,
+    pub evd_card_cats: &'a Vec<EvidenceCardCategories>,
+    pub target_card_idxs: Option<Vec<i64>>,
+    pub winner_ids: Option<Vec<i64>>,
 }

@@ -1,21 +1,26 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use super::game::EvidenceCard;
+use crate::{
+    effects::Effect,
+    resources::game_resources::{EvidenceCard, Riddle},
+};
 
-#[derive(Serialize, Clone)]
-pub struct Riddle {
-    pub id: i64,
-    pub text: String,
-}
-
-#[derive(Serialize)]
-pub enum RiddleProgress {
-    Correct((Option<Riddle>, Option<EvidenceCard>)),
-    Incorrect,
+pub struct Item<'a> {
+    tag: String,
+    name: String,
+    flavor_text: String,
+    expend: bool,
+    effects: Vec<&'a dyn Effect>,
 }
 
 #[derive(Serialize)]
 pub enum QuestEvent {
     Monster(i64),
     Riddle(i64),
+}
+
+#[derive(Serialize)]
+pub enum GuessRiddleResult {
+    Correct,
+    Incorrect,
 }

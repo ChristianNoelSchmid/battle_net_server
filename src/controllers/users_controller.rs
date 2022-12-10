@@ -1,28 +1,18 @@
 use rocket::{get, post, routes, serde::json::Json, Build, Rocket};
 
 use crate::{
-    auth::AuthUser,
-    db_services::user_db_services::{all_users, update_evidence_card, user_evidence_cards},
-    sqlite::db, models::users::{User, UserState},
+    db_services::user_db_services::{update_evidence_card, user_evidence_cards},
+    middleware::auth::AuthUser,
+    models::users::UserState,
+    sqlite::db,
 };
 
 pub fn routes(rocket: Rocket<Build>) -> Rocket<Build> {
     let rocket = rocket.mount(
         "/users",
-        routes![
-            get_all_users,
-            post_login,
-            get_user_state,
-            post_update_evidence_card
-        ],
+        routes![post_login, get_user_state, post_update_evidence_card],
     );
     rocket
-}
-
-#[get("/all")]
-fn get_all_users(_user: AuthUser) -> Json<Vec<User>> {
-    let db = db();
-    Json(all_users(&db))
 }
 
 #[post("/login")]

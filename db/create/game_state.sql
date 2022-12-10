@@ -1,53 +1,40 @@
-/* All users in the given game */
 CREATE TABLE users (
-    id             INTEGER  PRIMARY KEY  AUTOINCREMENT,
-    card_id        INTEGER  NOT NULL,
-    user_name      TEXT     NOT NULL, 
-    passwd         TEXT     NOT NULL,
-    user_img_path  TEXT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    passwd TEXT NOT NULL,
+    card_idx INTEGER NOT NULL
+);
+CREATE TABLE stats (
+    health INTEGER NOT NULL,
+    magicka INTEGER NOT NULL,
+    flee_from_changes INTEGER
+);
+/* All users in the given game */
+CREATE TABLE users_state (
     last_login     DATETIME DEFAULT NOW,
 
-    FOREIGN KEY (card_id) REFERENCES cards(id)
-);
-/* All card categories for the game running in the database */
-CREATE TABLE categories (
-    id        INTEGER  PRIMARY KEY  AUTOINCREMENT, 
-    cat_name  TEXT     NOT NULL
-);
-/* All evidence cards for the game running in the database */
-CREATE TABLE evidence_cards (
-    id             INTEGER  PRIMARY KEY AUTOINCREMENT,
-    cat_id         INT      NOT NULL,
-    item_name      TEXT     NOT NULL,
-    item_img_path  TEXT,
-
-    FOREIGN KEY (cat_id) REFERENCES categories(id)
+    base_stats_id  INTEGER  NOT NULL, 
+    stats          INTEGER NOT NULL
 );
 /* All evidence cards individual users have discovered,
    or are marking as potential */
 CREATE TABLE user_evidence_cards (
     user_id    INT      NOT NULL,
-    card_id    INT      NOT NULL,
+    cat_idx    TEXT     NOT NULL,
+    card_idx   INT      NOT NULL,
     confirmed  BOOLEAN,
 
-    PRIMARY KEY (user_id, card_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (card_id) REFERENCES cards(id)
+    PRIMARY KEY (user_id, cat_idx, card_idx),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 /* The game state - a singleton table */
 CREATE TABLE game_state (
-    murdered_user_id  INTEGER  NOT NULL,
-    FOREIGN KEY (murdered_user_id) REFERENCES users(id)
-);
-/* The target cards for the game */
-CREATE TABLE game_target_cards (
-    card_id INTEGER NOT NULL,
-    FOREIGN KEY (card_id) REFERENCES evidence_cards(id)
+    murdered_user_id   INTEGER  NOT NULL,
+    target_card_idxs   TEXT     NOT NULL,
+    winners            TEXT     NOT NULL  
 );
 /* All users who have won the game */
 CREATE TABLE winners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    user_idx INTEGER NOT NULL
 );

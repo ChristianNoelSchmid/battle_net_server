@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'christmas_2022'",
+            "name": "Debug Unit Tests",
             "cargo": {
                 "args": [
                     "test",
@@ -26,44 +26,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'christmas_2022'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=christmas_2022",
-                    "--package=christmas_2022"
-                ],
-                "filter": {
-                    "name": "christmas_2022",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'christmas_2022'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=christmas_2022",
-                    "--package=christmas_2022"
-                ],
-                "filter": {
-                    "name": "christmas_2022",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'main'",
+            "name": "Debug Server",
             "cargo": {
                 "args": [
                     "build",
@@ -77,25 +40,6 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'main'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=main",
-                    "--package=christmas_2022"
-                ],
-                "filter": {
-                    "name": "main",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
+        } 
     ]
 }

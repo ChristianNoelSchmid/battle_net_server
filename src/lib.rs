@@ -1,5 +1,4 @@
-pub mod auth;
-pub mod cors;
+pub mod effects;
 pub mod jwt;
 pub mod sqlite;
 
@@ -16,9 +15,20 @@ pub mod db_services {
     pub mod user_db_services;
 }
 
+pub mod middleware {
+    pub mod auth;
+    pub mod cors;
+}
+
 pub mod models {
     pub mod game;
+    pub mod model;
     pub mod quests;
     pub mod users;
-    pub mod model;
 }
+
+pub mod resources {
+    pub mod game_resources;
+}
+
+pub mod tools;
