@@ -1,7 +1,5 @@
-use crate::{resources::game_resources::BaseStats, services::game_service::data_layer::entities::CardModel};
+use crate::resources::game_resources::BaseStats;
 use serde::Serialize;
-
-
 
 #[derive(Serialize, Clone, Copy)]
 pub struct Stats {

@@ -15,7 +15,9 @@ pub enum GameServiceError {
     #[error("Game already running")]
     GameAlreadyRunning,
     #[error("Game is not running")]
-    GameNotRunning
+    GameNotRunning,
+    #[error("Out of range of categories or cards. Please check your range and try again.")]
+    GuessOutOfRange
 }
 
 impl Into<GameServiceError> for DataLayerError {

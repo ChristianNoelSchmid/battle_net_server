@@ -3,12 +3,12 @@ use std::sync::Arc;
 use axum::{
     extract::{State, FromRef},
     response::IntoResponse,
-    Json, routing::{put, post}, Router, middleware,
+    Json, routing::{put, post}, Router
 };
 
 use tower_cookies::Cookies;
 
-use crate::{services::{auth_service::{AuthService, error::AuthServiceError}, token_service::TokenService}, middleware::auth_middleware::{auth_middleware, AuthContext}};
+use crate::services::{auth_service::{AuthService, error::AuthServiceError}, token_service::TokenService};
 
 use serde::{Deserialize, Serialize};
 

@@ -110,7 +110,6 @@ mod tests {
     #[derive(Deserialize, Serialize)]
     struct TokenContents {
         user_id: String,
-        role: String,
         expires: String,
     }
 
@@ -141,7 +140,8 @@ mod tests {
         let str = general_purpose::STANDARD_NO_PAD.decode(str).unwrap();
         let mut contents: TokenContents =
             serde_json::from_str(&String::from_utf8_lossy(&str).to_string()).unwrap();
-        contents.role = "Admin".to_string();
+
+        contents.user_id = "10".to_string();
 
         // Build the new token with the new role, but with the same
         // header and key
