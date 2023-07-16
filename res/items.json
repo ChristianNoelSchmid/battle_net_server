@@ -1,0 +1,14 @@
+[{
+    "tag": "basic_dagger",
+    "name": "dagger",
+    "item_type": { "weapon": 3 },
+    "flavor_text": "A simple utility weapon. It dag dag dags!"
+}, {
+    "tag": "basic_armor_padded",
+    "name": "Padded Armor",
+    "item_type": "equipable",
+    "flavor_text": "Despite its name, its uncomfortable to wear.",
+    "effects_self": {
+        "boost_armor": 3
+    }
+}]

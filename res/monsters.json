@@ -1,0 +1,23 @@
+[{
+    "name": "Wilfred, the Esteemed Wizard",
+    "level": 2,
+    "spell_tags": [],
+    "stats": {
+        "health": 10,
+        "magicka": 50,
+        "reflex": 5,
+        "wisdom": 10,
+        "armor": 2
+    }
+}, {
+    "name": "Possesed Nutcracker",
+    "level": 1,
+    "spell_tags": [],
+    "stats": {
+        "health": 4,
+        "magicka": 0,
+        "reflex": 8,
+        "wisdom": 2,
+        "armor": 8
+    }
+}]

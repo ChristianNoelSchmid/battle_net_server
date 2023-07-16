@@ -1,28 +1,30 @@
-pub mod effects;
 pub mod jwt;
-pub mod sqlite;
 
-pub mod controllers {
-    pub mod game_controller;
+pub mod routes {
+    pub mod game_routes;
     pub mod quest_controller;
     pub mod sabotage_controller;
     pub mod users_controller;
+    pub mod auth_routes;
 }
 
-pub mod db_services {
-    pub mod game_db_services;
-    pub mod quest_db_services;
-    pub mod user_db_services;
+pub mod data_layer_error;
+
+pub mod services {
+    // pub mod quest_db_services;
+    // pub mod user_db_services;
+    // pub mod effects_service;
+    pub mod game_service;
+    pub mod auth_service;
+    pub mod token_service;
 }
 
 pub mod middleware {
-    pub mod auth;
-    pub mod cors;
+    pub mod auth_middleware;
 }
 
 pub mod models {
     pub mod game;
-    pub mod model;
     pub mod quests;
     pub mod users;
 }

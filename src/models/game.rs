@@ -1,17 +1,27 @@
+use crate::{resources::game_resources::BaseStats, services::game_service::data_layer::entities::CardModel};
 use serde::Serialize;
 
-use crate::resources::game_resources::{EvidenceCard, EvidenceCardCategories};
 
-#[derive(Serialize)]
-pub struct GameInitialState {
-    pub target_card_idxs: Vec<i64>,
-    pub murdered_user_id: i64,
+
+#[derive(Serialize, Clone, Copy)]
+pub struct Stats {
+    pub health: i64,
+    pub magicka: i64,
+    pub armor: i64,
+    pub wisdom: i64,
+    pub reflex: i64,
+    pub miss_turn: bool,
 }
 
-#[derive(Serialize)]
-pub struct GameState<'a> {
-    pub murdered_user_idx: i64,
-    pub evd_card_cats: &'a Vec<EvidenceCardCategories>,
-    pub target_card_idxs: Option<Vec<i64>>,
-    pub winner_ids: Option<Vec<i64>>,
+impl Stats {
+    pub fn from_base_stats(b_stats: BaseStats) -> Self {
+        Self {
+            health: b_stats.health,
+            magicka: b_stats.magicka,
+            armor: b_stats.armor,
+            wisdom: b_stats.wisdom,
+            reflex: b_stats.reflex,
+            miss_turn: false,
+        }
+    }
 }

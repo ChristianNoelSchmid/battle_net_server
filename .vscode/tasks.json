@@ -17,6 +17,13 @@
             "type": "shell",
             "args": ["watch", "-x", "run"],
             "group": "build"
+        },
+        {
+            "label": "Reset Db and Watch Server",
+            "type": "shell",
+            "dependsOn": ["Reset Database", "Watch Server"],
+            "command": "echo",
+            "group": "build"
         }
     ]
 }

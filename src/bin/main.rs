@@ -1,31 +1,61 @@
-#[macro_use]
-extern crate rocket;
+use std::{fs, sync::Arc, net::SocketAddr};
+
+use axum::Router;
+use dotenvy::dotenv;
+use dotenv_codegen::dotenv;
+
 use lazy_static::lazy_static;
 
 use christmas_2022::{
-    controllers::{game_controller, quest_controller, users_controller},
-    middleware::cors::Cors,
-    resources::game_resources::{ResourceLoader, Resources},
+    resources::game_resources::{ResourceLoader, Resources}, 
+    services::{token_service::{settings::TokenSettings, CoreTokenService}, 
+    auth_service::{data_layer::DbAuthDataLayer, CoreAuthService}, 
+    game_service::{data_layer::DbGameDataLayer, DbGameService}}, 
+    routes::{auth_routes, game_routes},
 };
-use rocket::fs::{relative, FileServer};
+use sqlx::SqlitePool;
+use tower_cookies::CookieManagerLayer;
+use tower_http::trace::{TraceLayer, self};
+use tracing::Level;
+
 lazy_static! {
-    static ref RES_LOADER: ResourceLoader = ResourceLoader::load(String::new());
+    static ref DATABASE_URL: &'static str = {
+        dotenv().unwrap();
+        dotenv!("DATABASE_URL")
+    };
 }
 
-#[launch]
-fn rocket() -> _ {
-    let mut rckt = rocket::build()
-        // Build Cors policy
-        .attach(Cors)
-        // Create Resources state management
-        .manage(Resources::from_loader(&RES_LOADER))
-        // Build the file server
-        .mount("/assets", FileServer::from(relative!("static")));
+#[tokio::main]
+async fn main() {
+    // Setup tracing_subscriber
+    tracing_subscriber::fmt().with_target(false).compact().init();
 
-    // Apply all the routes from controllers
-    rckt = game_controller::routes(rckt);
-    rckt = quest_controller::routes(rckt);
-    rckt = users_controller::routes(rckt);
+    // Setup state
+    let db = SqlitePool::connect(&DATABASE_URL).await.unwrap();
+    let token_settings: TokenSettings = serde_json::from_str(&fs::read_to_string("./token_settings.json").unwrap()).unwrap();
+    let token_service = Arc::new(CoreTokenService::new(token_settings.clone()));
+    let res = Arc::new(Resources::from_loader(ResourceLoader::load(String::from("./res"))));
 
-    rckt
+    let auth_data_layer = Arc::new(DbAuthDataLayer::new(db.clone(), token_settings.clone()));
+    let auth_service = Arc::new(CoreAuthService::new(auth_data_layer.clone(), token_service.clone())); 
+
+    let game_data_layer = Arc::new(DbGameDataLayer::new(db));
+    let game_service = Arc::new(DbGameService::new(game_data_layer, auth_service.clone(), res.clone()));
+
+    let app = Router::new()
+        // Routes
+        .nest("/auth", auth_routes::routes(auth_service, token_service.clone()))
+        .nest("/game", game_routes::routes(game_service, token_service, res))
+        // Logging
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO))
+        )
+        // Cookies
+        .layer(CookieManagerLayer::new());
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3005));
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service()).await.unwrap();
 }
