@@ -1,14 +1,15 @@
 pub mod entities;
 
+use std::sync::Arc;
+
 use axum::async_trait;
 use derive_more::Constructor;
-use sqlx::SqlitePool;
+use prisma_client_rust::Direction;
+use rand::{seq::SliceRandom, thread_rng};
 
-use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
+use crate::{data_layer_error::Result, prisma::{PrismaClient, user, stats, game_winner, game_target_card, user_card}, resources::game_resources::BaseStats, models::game_models::{MurderedUserModel, CardModel, GameStateModel, UserCardModel}};
 
-use self::entities::{MurderedUserEntity, CardEntity, UserCardEntity, GameStateEntity};
-
-const PERSON_CAT_IDX: i64 = 0;
+const PERSON_CAT_IDX: i32 = 0;
 
 #[async_trait]
 pub trait GameDataLayer : Send + Sync {
@@ -21,172 +22,206 @@ pub trait GameDataLayer : Send + Sync {
     /// as that is generated in this process), and base user stats. 
     /// Returns the randomly chosen murdered user.
     ///
-    async fn setup_game<'a>(&self, target_cards: &'a [CardEntity], base_stats: &'a BaseStats) -> Result<MurderedUserEntity>;
+    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<Option<MurderedUserModel>>;
     /// 
     /// Returns all current game state data, as it pertains to the particular user
     /// (ie. if the user has won, their collection of evidence cards, etc.)
     /// 
-    async fn game_state(&self, user_id: i64) -> Result<Option<GameStateEntity>>;
+    async fn game_state(&self, user_id: i32) -> Result<Option<GameStateModel>>;
     ///
     /// Gets all target cards in the current game.
     /// The cards users have to guess to win.
     /// 
-    async fn get_target_cards(&self) -> Result<Option<Vec<CardEntity>>>;
+    async fn get_target_cards(&self) -> Result<Vec<CardModel>>;
     ///
     /// Assigns the user to the winner collection
     /// 
-    async fn add_new_winner(&self, user_id: i64) -> Result<()>;
+    async fn add_new_winner(&self, user_id: i32) -> Result<()>;
     ///
     /// Updates the status of a user's card, if required.
     /// Unconfirmed cards which are no longer guessed are removed, while
     /// Unconfirmed cards that are guessed are added to the user's data (if needed)
     /// 
-    async fn update_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64, guessed: bool) -> Result<()>;
+    async fn update_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32, guessed: bool) -> Result<()>;
+    ///
+    /// Retrieves the indices of all evidence cards that the user has confirmed
+    /// 
+    async fn get_confirmed_user_cards(&self, user_id: i32) -> Result<Vec<CardModel>>;
+    ///
+    /// Adds card to user's confirmed set, marked as `confirmed`
+    /// 
+    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()>;
 }
 
 #[derive(Constructor)]
 pub struct DbGameDataLayer { 
-    db: SqlitePool,
+    db: Arc<PrismaClient>
 }
 
 #[async_trait]
 impl GameDataLayer for DbGameDataLayer {
     async fn is_game_active(&self) -> Result<bool> {
-        let game_state = sqlx::query!("SELECT murdered_user_id FROM game_state LIMIT 1")
-            .fetch_one(&self.db).await;
+        // Get the game state from the database (there should only be one)
+        let game_state = self.db.game_state().find_first(vec![]).exec().await;
         
         return match game_state {
             Ok(_) => Ok(true),
-            Err(sqlx::Error::RowNotFound) => Ok(false),
             Err(e) => Err(Box::new(e))
         };
     }
 
-    async fn setup_game<'a>(&self, target_cards: &'a [CardEntity], base_stats: &'a BaseStats) -> Result<MurderedUserEntity> {
-        // Select a random user as the murdered user
-        let murdered_user = sqlx::query_as!(MurderedUserEntity, "SELECT id, card_idx FROM users ORDER BY RANDOM()")
-            .fetch_one(&self.db).await.map_err(|e| Box::new(e))?;
-        
+    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<Option<MurderedUserModel>> {
+        // Get all user ids and card_idxs
+        let users = self.db.user().find_many(vec![]).exec().await.map_err(|e| Box::new(e))?;
+
+        // Choose a random user from the list
+        let murdered_user = users.choose(&mut thread_rng());
+
+        // Return None if there is no user to murder. There must be users present to initialize game
+        if let None = murdered_user {
+            return Ok(None);
+        }
+        let murdered_user = murdered_user.unwrap();
+
+        // Get all other user ids
+        let user_ids: Vec<i32> = users.iter().filter(|u| u.id != murdered_user.id).map(|u| u.id).collect();
+
         // Add the murdered user to all users evidence cards (that user is not a target card)
-        let users = sqlx::query!("SELECT id FROM users").fetch_all(&self.db).await.map_err(|e| Box::new(e))?;
-        for user in &users {
-            sqlx::query!(r"INSERT INTO user_evidence_cards (user_id, cat_idx, card_idx, confirmed)
-                VALUES (?, ?, ?, 1)",
-                user.id, PERSON_CAT_IDX, murdered_user.card_idx
-            ).execute(&self.db).await.map_err(|e| Box::new(e))?;
+        for id in &user_ids {
+            self.db.user_card().create(
+                PERSON_CAT_IDX, murdered_user.card_idx, user::id::equals(*id), 
+                vec![user_card::confirmed::set(true)]
+            ).exec().await.map_err(|e| Box::new(e))?;
         }
 
         // Insert base player stats for each user
-        for user in users {
-            let stats = sqlx::query!(r"INSERT INTO stats (health, magicka, armor, wisdom, reflex, missing_next_turn)
-                VALUES (?, ?, ?, ?, ?, FALSE)",
-                base_stats.health, base_stats.magicka, base_stats.armor, base_stats.wisdom, base_stats.reflex
-            ).execute(&self.db).await.map_err(|e| Box::new(e))?;
-            let new_row_id = stats.last_insert_rowid();
+        for id in user_ids {
+            // Create the user's stats and add to the database
+            let stats = self.db.stats().create(
+                base_stats.health, base_stats.magicka, base_stats.armor, 
+                base_stats.wisdom, base_stats.reflex, false, vec![]
+            ).exec().await.map_err(|e| Box::new(e))?;
 
-            // Insert player state for each user
-            sqlx::query!("INSERT INTO user_state (user_id, cur_stats_id) VALUES (?, ?)", user.id, new_row_id)
-                .execute(&self.db).await.map_err(|e| Box::new(e))?;
+            // Associate the user to their stats
+            self.db.user_state().create(user::id::equals(id), stats::id::equals(stats.id), vec![])
+                .exec().await.map_err(|e| Box::new(e))?;
         }
 
         // Insert each generated target card into the game_target_cards table
         for target_card in target_cards {
-            sqlx::query!("INSERT INTO game_target_cards (cat_idx, card_idx) VALUES (?, ?)", target_card.cat_idx, target_card.card_idx)
-                .execute(&self.db).await.map_err(|e| Box::new(e))?;
+            self.db.game_target_card().create(target_card.cat_idx, target_card.card_idx, vec![])
+                .exec().await.map_err(|e| Box::new(e))?;
         }
 
         // Add the initialized game state
-        sqlx::query!("INSERT INTO game_state (murdered_user_id) VALUES (?)", murdered_user.id)
-            .execute(&self.db).await.map_err(|e| Box::new(e))?;
+        self.db.game_state().create(user::id::equals(murdered_user.id), vec![])
+            .exec().await.map_err(|e| Box::new(e))?;
 
-        Ok(murdered_user)
+        Ok(Some(MurderedUserModel { card_idx: murdered_user.card_idx }))
     }
 
-    async fn game_state(&self, user_id: i64) -> Result<Option<GameStateEntity>> {
+    async fn game_state(&self, user_id: i32) -> Result<Option<GameStateModel>> {
         // Determine if the given user has won the game
-        let has_won = sqlx::query!("SELECT * FROM game_winners WHERE user_id = ?", user_id)
-            .fetch_one(&self.db).await;
+        let has_won = self.db.game_winner().find_first(vec![game_winner::user_id::equals(user_id)])
+            .exec().await.map_err(|e| Box::new(e))?;
 
-        let (target_cards, winner_idxs);
+        // If the user has won, retrieve the target cards and all current winners
+        let (mut target_cards, mut winner_idxs) = (None, None);
 
-        match has_won {
-            // If the user has won, retrieve the target cards and all current winners
-            Ok(_) => {
-                target_cards = Some(
-                    sqlx::query_as!(CardEntity, "SELECT cat_idx, card_idx FROM game_target_cards ORDER BY cat_idx")
-                        .fetch_all(&self.db).await.map_err(|e| Box::new(e))?
-                );
-                winner_idxs = Some(
-                    sqlx::query!("SELECT u.card_idx FROM game_winners gw JOIN users u ON gw.user_id = u.id ORDER BY gw.id")
-                        .fetch_all(&self.db).await.map_err(|e| Box::new(e))?
-                        .iter().map(|rec| rec.card_idx)
-                        .collect()
-                );
-            },
-            // Otherwise, return None for target game cards and winners
-            Err(sqlx::Error::RowNotFound) => (target_cards, winner_idxs) = (None, None),
-            Err(e) => return Err(Box::new(e))
+        if let Some(_) = has_won {
+            target_cards = Some(
+                self.db.game_target_card().find_many(vec![]).order_by(game_target_card::OrderByParam::CatIdx(Direction::Asc))
+                    .exec().await.map_err(|e| Box::new(e))?
+                    .iter().map(|card| CardModel { cat_idx: card.cat_idx, card_idx: card.card_idx }).collect()
+            );
+            
+            winner_idxs = Some(
+                self.db.game_winner().find_many(vec![]).order_by(game_winner::OrderByParam::Id(Direction::Asc))
+                    .with(game_winner::user::fetch())
+                    .exec().await.map_err(|e| Box::new(e))?
+                    .iter().map(|r| r.user.as_ref().unwrap().card_idx).collect()
+            );
         }
 
         // Get the user's current guessed cards and confirmed cards
-        let user_cards = sqlx::query_as!(UserCardEntity, r"
-                SELECT cat_idx, card_idx, confirmed FROM user_evidence_cards WHERE user_id = ?
-            ", user_id
-        ).fetch_all(&self.db).await.map_err(|e| Box::new(e))?;
-
-        let murdered_user_idx = sqlx::query!("SELECT id FROM users JOIN game_state ON murdered_user_id = users.id")
-            .fetch_one(&self.db).await;
+        let user_cards = self.db.user_card().find_many(vec![user_card::user_id::equals(user_id)])
+            .exec().await.map_err(|e| Box::new(e))?
+            .iter().map(|card| UserCardModel { cat_idx: card.cat_idx, card_idx: card.card_idx, confirmed: card.confirmed })
+            .collect();
+        
+        let murdered_user_idx = self.db.game_state().find_first(vec![])
+            .exec().await.map_err(|e| Box::new(e))?;
 
         return match murdered_user_idx {
-            Ok(rec) => Ok(Some(GameStateEntity { murdered_user_idx: rec.id, target_cards, user_cards, winner_idxs })),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(e) => Err(Box::new(e))
+            Some(rec) => Ok(Some(GameStateModel { murdered_user_idx: rec.id, target_cards, user_cards, winner_idxs })),
+            None => Ok(None)
         };
     }
 
-    async fn get_target_cards(&self) -> Result<Option<Vec<CardEntity>>> {
-        let target_cards = sqlx::query_as!(CardEntity, "SELECT card_idx, cat_idx FROM game_target_cards")
-            .fetch_all(&self.db).await;
-
-        return match target_cards {
-            Ok(target_cards) => Ok(Some(target_cards)),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(e) => Err(Box::new(e))
-        };
+    async fn get_target_cards(&self) -> Result<Vec<CardModel>> {
+        Ok(
+            self.db.game_target_card().find_many(vec![]).exec().await.map_err(|e| Box::new(e))?
+                .iter().map(|card| CardModel { cat_idx: card.cat_idx, card_idx: card.card_idx }).collect()
+        )
     }
 
-    async fn add_new_winner(&self, user_id: i64) -> Result<()> {
-        sqlx::query!("INSERT INTO game_winners (user_id) VALUES (?)", user_id)
-            .execute(&self.db).await.map_err(|e| Box::new(e))?;
-
-        Ok(()) 
+    async fn add_new_winner(&self, user_id: i32) -> Result<()> {
+        self.db.game_winner().create(user::id::equals(user_id), vec![]).exec().await.map_err(|e| Box::new(e))?;
+        Ok(())
     }
 
-    async fn update_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64, guessed: bool) -> Result<()> {
+    async fn update_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32, guessed: bool) -> Result<()> {
+
         // Get the current value of the choice card
-        let result = sqlx::query!(
-            r"SELECT confirmed FROM user_evidence_cards WHERE cat_idx = ? AND card_idx = ? and user_id = ?", 
-            cat_idx, card_idx, user_id
-        ).fetch_one(&self.db).await;
+        let user_card = self.db.user_card().find_first(vec![
+            user_card::cat_idx::equals(cat_idx), 
+            user_card::card_idx::equals(card_idx), 
+            user_card::user_id::equals(user_id)
+        ])
+            .exec().await.map_err(|e| Box::new(e))?;
 
-        match result {
-            Err(sqlx::Error::RowNotFound) => {
-                if guessed {
-                    sqlx::query!(
-                        "INSERT INTO user_evidence_cards (user_id, cat_idx, card_idx, confirmed) VALUES (?, ?, ?, 0)",
-                        user_id, cat_idx, card_idx
-                    ).execute(&self.db).await.map_err(|e| Box::new(e))?;
-                } 
+        match user_card {
+            // If there's no user card that matches and the user has guessed, insert
+            // that card, unconfirmed
+            None if guessed => {
+                self.db.user_card().create(cat_idx, card_idx, user::id::equals(user_id), vec![])
+                    .exec().await.map_err(|e| Box::new(e))?;
             },
-            Ok(result) => {
-                if result.confirmed == 0 && !guessed {
-                    sqlx::query!(
-                        "DELETE FROM user_evidence_cards WHERE user_id = ? AND cat_idx = ? AND card_idx = ?",
-                        user_id, cat_idx, card_idx
-                    ).execute(&self.db).await.map_err(|e| Box::new(e))?;
-                }
+            // If a card does exist, is unconfirmed, and the user no longer guesses it,
+            // delete that card
+            Some(user_card) if user_card.confirmed && !guessed => {
+                self.db.user_card().delete(user_card::UniqueWhereParam::UserIdCatIdxCardIdxEquals(user_id, cat_idx, card_idx))
+                    .exec().await.map_err(|e| Box::new(e))?;
             },
-            Err(e) => return Err(Box::new(e)),
+            // Ignore any other cases - they do not affect the user card
+            // (card exists and is guessed doesn't matter, as there is already a card representing this)
+            // (card confirmed but no longer guessed doesn't matter, as the card is confirmed)
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    async fn get_confirmed_user_cards(&self, user_id: i32) -> Result<Vec<CardModel>> {
+        Ok(
+            self.db.user_card().find_many(vec![user_card::user_id::equals(user_id), user_card::confirmed::equals(true)])
+            .exec().await.map_err(|e| Box::new(e))?
+            .iter().map(|card| CardModel { cat_idx: card.cat_idx, card_idx: card.card_idx }).collect()
+        )
+    }
+
+    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()> {
+        // If the card already exists in the users evidence cards, update it to confirmed
+        if self.get_confirmed_user_cards(user_id).await?.iter().any(|c| c == &CardModel { cat_idx, card_idx }) {
+            self.db.user_card().update(
+                user_card::UniqueWhereParam::UserIdCatIdxCardIdxEquals(user_id, cat_idx, card_idx),
+                vec![user_card::confirmed::set(true)]
+            ).exec().await.map_err(|e| Box::new(e))?;
+
+        // Otherwise, create a new user card as confirmed
+        } else {
+            self.db.user_card().create(cat_idx, card_idx, user::id::equals(user_id), vec![user_card::confirmed::set(true)])
+                .exec().await.map_err(|e| Box::new(e))?;
         }
 
         Ok(())

@@ -1,0 +1,150 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./app.db"
+}
+
+generator client {
+  provider = "cargo prisma"
+  output   = "../src/prisma.rs"
+}
+
+model User {
+  id       Int    @default(autoincrement())
+  email    String @unique
+  pwd_hash String
+  card_idx Int
+
+  murdered_game_states GameState[]
+  refresh_tokens       RefreshToken[]
+  evidence_cards       UserCard[]
+  quests               Quest[]
+  state                UserState?
+  GameWinner           GameWinner?
+
+  @@id(id)
+  @@map("users")
+}
+
+model RefreshToken {
+  id             Int       @default(autoincrement())
+  user_id        Int
+  replacement_id Int?      @unique
+  created_on     DateTime  @default(now())
+  expires        DateTime?
+  token          String
+  revoked_on     DateTime?
+  revoked_by     String?
+
+  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  next_token     RefreshToken? @relation("RefreshTokenChain", fields: [replacement_id], references: [id], onDelete: Cascade)
+  previous_token RefreshToken? @relation("RefreshTokenChain")
+
+  @@id(id)
+  @@index(fields: [token])
+  @@map("refresh_tokens")
+}
+
+model Stats {
+  id                Int     @default(autoincrement())
+  health            Int
+  magicka           Int
+  armor             Int
+  wisdom            Int
+  reflex            Int
+  missing_next_turn Boolean
+
+  user_states    UserState[]
+  quest_monsters QuestMonster[]
+
+  @@id(id)
+  @@map("stats")
+}
+
+model UserState {
+  user_id    Int      @unique
+  last_login DateTime @default(now())
+  stats_id   Int      @unique
+
+  user  User  @relation(fields: [user_id], references: [id])
+  stats Stats @relation(fields: [stats_id], references: [id], onDelete: Cascade)
+
+  @@id(user_id)
+  @@map("user_states")
+}
+
+model UserCard {
+  user_id   Int     @unique
+  cat_idx   Int
+  card_idx  Int
+  confirmed Boolean @default(false)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, cat_idx, card_idx])
+  @@map("user_cards")
+}
+
+model GameState {
+  id               Int @default(autoincrement())
+  murdered_user_id Int
+
+  murdered_user User @relation(fields: [murdered_user_id], references: [id])
+
+  @@id(id)
+}
+
+model Quest {
+  id         Int      @default(autoincrement())
+  user_id    Int
+  lvl        Int      @default(0)
+  completed  Boolean  @default(false)
+  created_on DateTime @default(now())
+  quest_type Int
+
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  monster_state QuestMonster?
+  QuestRiddle   QuestRiddle?
+
+  @@id(id)
+  @@map("quests")
+}
+
+model QuestMonster {
+  id       Int @default(autoincrement())
+  quest_id Int @unique
+  stats_id Int @unique
+
+  quest Quest @relation(fields: [quest_id], references: [id], onDelete: Cascade)
+  stats Stats @relation(fields: [stats_id], references: [id], onDelete: Cascade)
+
+  @@id(id)
+  @@map("monster_states")
+}
+
+model QuestRiddle {
+  id         Int @default(autoincrement())
+  quest_id   Int @unique
+  riddle_idx Int
+
+  quest Quest @relation(fields: [quest_id], references: [id], onDelete: Cascade)
+
+  @@id(id)
+  @@map("quest_riddles")
+}
+
+model GameTargetCard {
+  cat_idx  Int
+  card_idx Int
+
+  @@id([cat_idx, card_idx])
+  @@map("game_target_cards")
+}
+
+model GameWinner {
+  id      Int  @default(autoincrement())
+  user_id Int  @unique
+  user    User @relation(fields: [user_id], references: [id])
+
+  @@id(id)
+  @@map("game_winners")
+}

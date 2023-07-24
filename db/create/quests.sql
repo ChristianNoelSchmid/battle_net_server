@@ -26,8 +26,10 @@ CREATE TABLE user_answered_riddles(
 CREATE TABLE quests (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     user_id INTEGER NOT NULL,
-    event_lvl INTEGER DEFAULT 0,
-    active BOOLEAN DEFAULT TRUE,
+    lvl INTEGER DEFAULT 0 NOT NULL,
+    completed BOOLEAN DEFAULT FALSE NOT NULL,
+    created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    quest_type INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
@@ -45,7 +47,6 @@ CREATE TABLE quest_monsters (
 CREATE TABLE quest_riddles (
     quest_id INTEGER NOT NULL,
     riddle_idx INTEGER NOT NULL,
-    active BOOLEAN NOT NULL,
     PRIMARY KEY (quest_id, riddle_idx),
     FOREIGN KEY (quest_id) REFERENCES quests (id)
 );

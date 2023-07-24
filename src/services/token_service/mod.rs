@@ -28,8 +28,8 @@ lazy_static! {
 }
 
 pub trait TokenService: Send + Sync {
-    fn generate_auth_tokens(&self, user_id: i64) -> TokensDto;
-    fn verify_access_token(&self, access_token: String) -> Result<i64>;
+    fn generate_auth_tokens(&self, user_id: i32) -> TokensDto;
+    fn verify_access_token(&self, access_token: String) -> Result<i32>;
 }
 
 #[derive(Clone, Constructor)]
@@ -42,7 +42,7 @@ impl TokenService for CoreTokenService {
     /// Using the given `info`, generates a JWT and a series of series of
     /// random bytes representing a refresh token.
     ///
-    fn generate_auth_tokens(&self, user_id: i64) -> TokensDto {
+    fn generate_auth_tokens(&self, user_id: i32) -> TokensDto {
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha26>");
 
@@ -65,7 +65,7 @@ impl TokenService for CoreTokenService {
     /// Verifies a JWT `token`, and returns the `AuthInfo` from the its content section with successful verification.
     /// Returns the associated `jwt` `Error` in the event of unsuccessful verification
     ///
-    fn verify_access_token(&self, token: String) -> Result<i64> {
+    fn verify_access_token(&self, token: String) -> Result<i32> {
         // Convert the JWT_SECRET env variable into a Hmac hasher
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha256>");
@@ -82,7 +82,7 @@ impl TokenService for CoreTokenService {
 
                 // Otherwise, return Ok with the AuthInfo from the token
                 } else {
-                    return Ok(claims.remove("user_id").unwrap().parse::<i64>().unwrap());
+                    return Ok(claims.remove("user_id").unwrap().parse::<i32>().unwrap());
                 }
             },
             Err(e) => Err(TokenError::JwtError(e))

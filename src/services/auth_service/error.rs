@@ -17,11 +17,11 @@ pub enum AuthServiceError {
     #[error("Password does not match for email {0}")]
     PasswordDoesNotMatch(String),
     #[error("Refresh token duplicate usage. duplicate ID `{dup_id}`, revoked ID `{revoked_id}`, user ID `{user_id}`")]
-    DuplicateRefresh { user_id: i64, dup_id: i64, revoked_id: i64 },
+    DuplicateRefresh { user_id: i32, dup_id: i32, revoked_id: i32 },
     #[error("The token provided doesn't exist")]
     TokenDoesNotExist,
     #[error("The given user cannot be found")]
-    UserNotFound(i64, i64)
+    UserNotFound(i32, i32)
 }
 
 impl Into<AuthServiceError> for DataLayerError {

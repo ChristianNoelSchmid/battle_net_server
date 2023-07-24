@@ -11,9 +11,8 @@ use christmas_2022::{
     services::{token_service::{settings::TokenSettings, CoreTokenService}, 
     auth_service::{data_layer::DbAuthDataLayer, CoreAuthService}, 
     game_service::{data_layer::DbGameDataLayer, DbGameService}}, 
-    routes::{auth_routes, game_routes},
+    routes::{auth_routes, game_routes}, prisma::PrismaClient,
 };
-use sqlx::SqlitePool;
 use tower_cookies::CookieManagerLayer;
 use tower_http::trace::{TraceLayer, self};
 use tracing::Level;
@@ -31,7 +30,7 @@ async fn main() {
     tracing_subscriber::fmt().with_target(false).compact().init();
 
     // Setup state
-    let db = SqlitePool::connect(&DATABASE_URL).await.unwrap();
+    let db = Arc::new(PrismaClient::_builder().build().await.unwrap());
     let token_settings: TokenSettings = serde_json::from_str(&fs::read_to_string("./token_settings.json").unwrap()).unwrap();
     let token_service = Arc::new(CoreTokenService::new(token_settings.clone()));
     let res = Arc::new(Resources::from_loader(ResourceLoader::load(String::from("./res"))));

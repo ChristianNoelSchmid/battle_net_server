@@ -32,7 +32,7 @@ CREATE TABLE user_evidence_cards (
     user_id INT NOT NULL,
     cat_idx INT NOT NULL,
     card_idx INT NOT NULL,
-    confirmed INT NOT NULL,
+    confirmed BOOLEAN NOT NULL,
 
     PRIMARY KEY (user_id, cat_idx, card_idx),
     FOREIGN KEY (user_id) REFERENCES users(id)

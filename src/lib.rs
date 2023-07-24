@@ -6,10 +6,12 @@ pub mod middleware {
 }
 
 pub mod models {
-    pub mod game;
-    pub mod quests;
-    pub mod users;
+    pub mod game_models;
+    pub mod quest_models;
+    pub mod auth_models;
 }
+
+pub mod prisma;
 
 pub mod routes {
     pub mod game_routes;
@@ -30,4 +32,5 @@ pub mod services {
     pub mod game_service;
     pub mod auth_service;
     pub mod token_service;
+    pub mod quest_service;
 }

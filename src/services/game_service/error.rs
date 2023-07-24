@@ -17,7 +17,9 @@ pub enum GameServiceError {
     #[error("Game is not running")]
     GameNotRunning,
     #[error("Out of range of categories or cards. Please check your range and try again.")]
-    GuessOutOfRange
+    GuessOutOfRange,
+    #[error("Users must be initialized to set up game")]
+    UsersNotFound
 }
 
 impl Into<GameServiceError> for DataLayerError {

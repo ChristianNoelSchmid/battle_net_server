@@ -3,7 +3,8 @@ name = "christmas_2022"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = [ "_prisma-cli" ]
 
 [dependencies]
 axum = { version = "0.6.18", features = ["headers", "macros"] }
@@ -18,13 +19,14 @@ jwt = "0.16.0"
 lazy_static = "1.4.0"
 log = "0.4.18"
 mockall = "0.11.3"
+prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.8", features = ["sqlite"] }
 rand = "0.8.5"
 regex = "1.6.0"
 rust-argon2 = "1.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.86"
 serde_with = "2.0.1"
-sqlx = { version = "0.6", features = [ "chrono", "runtime-tokio-rustls", "sqlite" ] }
+# sqlx = { version = "0.6", features = [ "chrono", "runtime-tokio-rustls", "sqlite" ] }
 sha2 = "0.10.6"
 thiserror = "1.0.43"
 tokio = { version = "1.29.1", features = ["full"] }
