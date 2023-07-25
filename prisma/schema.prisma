@@ -73,7 +73,7 @@ model UserState {
 }
 
 model UserCard {
-  user_id   Int     @unique
+  user_id   Int
   cat_idx   Int
   card_idx  Int
   confirmed Boolean @default(false)
@@ -91,6 +91,7 @@ model GameState {
   murdered_user User @relation(fields: [murdered_user_id], references: [id])
 
   @@id(id)
+  @@map("game_states")
 }
 
 model Quest {
@@ -113,6 +114,7 @@ model QuestMonster {
   id       Int @default(autoincrement())
   quest_id Int @unique
   stats_id Int @unique
+  monster_idx Int
 
   quest Quest @relation(fields: [quest_id], references: [id], onDelete: Cascade)
   stats Stats @relation(fields: [stats_id], references: [id], onDelete: Cascade)

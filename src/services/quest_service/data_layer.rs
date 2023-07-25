@@ -1,13 +1,11 @@
 
-pub mod entities;
-
 use std::collections::HashSet;
 
 use axum::async_trait;
 use chrono::{Datelike, Utc};
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
 
-use crate::{data_layer_error::Result, models::quest_models::QuestModel, resources::game_resources::{BaseStats, EvidenceCardCategories}, prisma::{PrismaClient, quest, user, stats, quest_riddle, user_card}, services::game_service::data_layer::entities::CardEntity};
+use crate::{data_layer_error::Result, models::{quest_models::QuestModel, game_models::CardModel}, resources::game_resources::{BaseStats, EvidenceCardCategories}, prisma::{PrismaClient, quest, user, stats, quest_riddle, user_card}};
 
 #[async_trait]
 pub trait QuestDataLayer : Send + Sync {
@@ -46,7 +44,7 @@ pub trait QuestDataLayer : Send + Sync {
     /// Confirms a new, random evidence card, if any exist that has yet to be confirmed
     /// in the user's collection
     /// 
-    async fn confirm_rand_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardEntity>>;
+    async fn confirm_rand_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
     ///
     /// Resets the stats for all users
     /// 
@@ -65,9 +63,9 @@ impl QuestDataLayer for DbQuestDataLayer {
             .exec().await.map_err(|e| Box::new(e))?;
 
         if let Some(quest) = quest {
-            // Check if the quest is from today - if not, return None. Otherwise, return the quest
+            // Check if the quest is from today and is not completed - if not, return None. Otherwise, return the quest
             let today = Utc::now().naive_utc();
-            if quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
+            if !quest.completed && quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
                 return Ok(Some(QuestModel { 
                     id: quest.id, created_on: quest.created_on, user_id: quest.user_id, 
                     lvl: quest.lvl, quest_type: quest.quest_type, completed: quest.completed
@@ -82,7 +80,7 @@ impl QuestDataLayer for DbQuestDataLayer {
         let daily_quest = self.get_active_user_quest(user_id).await?;
         let mut lvl = 1;
 
-        // If there is a daily quest, mark it as completed, and set lvl to incremented value
+        // If there is a daily quest and it's completed, create new quest and set lvl to incremented value
         if let Some(daily_quest) = daily_quest {
             self.db.quest().update(quest::UniqueWhereParam::IdEquals(daily_quest.id), vec![quest::completed::set(true)])
                 .exec().await.map_err(|e| Box::new(e))?;
@@ -100,7 +98,7 @@ impl QuestDataLayer for DbQuestDataLayer {
     async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()> {
         let stats = self.db.stats().create(stats.health, stats.magicka, stats.armor, stats.wisdom, stats.reflex, false, vec![])
             .exec().await.map_err(|e| Box::new(e))?;
-        self.db.quest_monster().create(quest::id::equals(quest_id), stats::id::equals(stats.id), vec![])
+        self.db.quest_monster().create(monster_idx, quest::id::equals(quest_id), stats::id::equals(stats.id), vec![])
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(())
@@ -154,7 +152,7 @@ impl QuestDataLayer for DbQuestDataLayer {
         Ok(())
     }
 
-    async fn confirm_rand_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardEntity>> {
+    async fn confirm_rand_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
         let mut rng = StdRng::from_entropy();
 
         // Create an iterator of all permutations of cat idx to card idx
@@ -171,7 +169,7 @@ impl QuestDataLayer for DbQuestDataLayer {
         
         // Choose a random cat and card idx that isn't in the confirmed collection
         let choice = card_cat_pairs.filter(|pair| !conf_cat_card_idxs.contains(pair)).choose(&mut rng);
-        Ok(choice.and_then(|choice| Some(CardEntity { cat_idx: choice.0, card_idx: choice.1 })))
+        Ok(choice.and_then(|choice| Some(CardModel { cat_idx: choice.0, card_idx: choice.1 })))
     }
 
     async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<()> {

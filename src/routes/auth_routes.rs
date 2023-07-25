@@ -8,7 +8,7 @@ use axum::{
 
 use tower_cookies::Cookies;
 
-use crate::services::{auth_service::{AuthService, error::AuthServiceError}, token_service::TokenService};
+use crate::services::{auth_service::{AuthService, error::AuthServiceError}};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +35,6 @@ pub struct LoginPayload {
 #[derive(Clone, FromRef)]
 struct AuthRoutesState {
     auth_service: Arc<dyn AuthService>,
-    token_service: Arc<dyn TokenService>
 }
 
 ///
@@ -47,13 +46,13 @@ pub struct AuthPayload {
     pub access_token: String,
 }
 
-pub fn routes(auth_service: Arc<dyn AuthService>, token_service: Arc<dyn TokenService>) -> Router {
+pub fn routes(auth_service: Arc<dyn AuthService>) -> Router {
     Router::new()
         // Routes
         .route("/refresh", put(refresh))
         .route("/login", post(login))
         // State
-        .with_state(AuthRoutesState { auth_service, token_service })
+        .with_state(AuthRoutesState { auth_service })
 }
 
 ///

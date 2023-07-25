@@ -6,8 +6,6 @@ use derive_more::Constructor;
 
 use crate::{data_layer_error::Result, services::token_service::settings::TokenSettings, prisma::{PrismaClient, user, refresh_token}, models::auth_models::{UserModel, RefrTokenModel}};
 
-pub mod entities;
-
 #[async_trait]
 pub trait AuthDataLayer : Send + Sync {
     async fn get_user_by_id(&self, user_id: i32) -> Result<Option<UserModel>>;
@@ -77,7 +75,7 @@ impl AuthDataLayer for DbAuthDataLayer {
                 refresh_token::replacement_id::set(repl_id)
             ]
         )
-            .exec().await.map_err(|e| Box::new(e));
+            .exec().await.map_err(|e| Box::new(e))?;
         Ok(())
     }
     async fn create_user(&self, email: String, pwd_hash: String, card_idx: i32) -> Result<()> {

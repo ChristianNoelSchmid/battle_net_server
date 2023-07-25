@@ -8,7 +8,7 @@ use rand::{seq::IteratorRandom, thread_rng};
 
 use crate::{
     models::{
-        game_models::Stats,
+        game_models::{Stats, CardModel},
         quest_models::{
             QuestEventMonster, RiddleModel, QuestReward, RiddleStatus, QuestModel,
         },
@@ -18,16 +18,16 @@ use crate::{
 
 use self::{error::{Result, QuestServiceError}, data_layer::QuestDataLayer};
 
-use super::{auth_service::AuthService, game_service::data_layer::entities::CardEntity};
+use super::auth_service::AuthService;
 
 #[async_trait]
-pub trait QuestService {
+pub trait QuestService : Send + Sync {
     ///
     /// Generates a new quest of the specified `quest_type` for the user with the given `user_id`
     /// 
     async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestModel>;
     async fn guess_riddle(&self, user_id: i32, answer: String) -> Result<RiddleStatus>;
-    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardEntity>>;
+    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardModel>>;
     async fn reset_users(&self) -> Result<()>;
 }
 
@@ -82,7 +82,7 @@ impl QuestService for CoreQuestService {
         return Ok(RiddleStatus::Incorrect);
     }
 
-    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardEntity>> {
+    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardModel>> {
         self.data_layer.confirm_rand_card(user_id, &self.res.evd_cats_and_cards).await.map_err(|e| e.into())
     }
 

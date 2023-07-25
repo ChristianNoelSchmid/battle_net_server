@@ -1,5 +1,3 @@
-pub mod entities;
-
 use std::sync::Arc;
 
 use axum::async_trait;
@@ -62,11 +60,11 @@ pub struct DbGameDataLayer {
 impl GameDataLayer for DbGameDataLayer {
     async fn is_game_active(&self) -> Result<bool> {
         // Get the game state from the database (there should only be one)
-        let game_state = self.db.game_state().find_first(vec![]).exec().await;
+        let game_state = self.db.game_state().find_first(vec![]).exec().await.map_err(|e| Box::new(e))?;
         
         return match game_state {
-            Ok(_) => Ok(true),
-            Err(e) => Err(Box::new(e))
+            Some(_) => Ok(true),
+            None => Ok(false)
         };
     }
 
@@ -149,11 +147,16 @@ impl GameDataLayer for DbGameDataLayer {
             .iter().map(|card| UserCardModel { cat_idx: card.cat_idx, card_idx: card.card_idx, confirmed: card.confirmed })
             .collect();
         
-        let murdered_user_idx = self.db.game_state().find_first(vec![])
+        let game_state = self.db.game_state().find_first(vec![])
             .exec().await.map_err(|e| Box::new(e))?;
 
-        return match murdered_user_idx {
-            Some(rec) => Ok(Some(GameStateModel { murdered_user_idx: rec.id, target_cards, user_cards, winner_idxs })),
+        return match game_state {
+            Some(game_state) => Ok(Some(GameStateModel { 
+                murdered_user_idx: game_state.murdered_user_id, 
+                target_cards, 
+                user_cards, 
+                winner_idxs 
+            })),
             None => Ok(None)
         };
     }
@@ -189,7 +192,7 @@ impl GameDataLayer for DbGameDataLayer {
             },
             // If a card does exist, is unconfirmed, and the user no longer guesses it,
             // delete that card
-            Some(user_card) if user_card.confirmed && !guessed => {
+            Some(user_card) if !user_card.confirmed && !guessed => {
                 self.db.user_card().delete(user_card::UniqueWhereParam::UserIdCatIdxCardIdxEquals(user_id, cat_idx, card_idx))
                     .exec().await.map_err(|e| Box::new(e))?;
             },

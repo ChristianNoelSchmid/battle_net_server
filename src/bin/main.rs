@@ -43,8 +43,8 @@ async fn main() {
 
     let app = Router::new()
         // Routes
-        .nest("/auth", auth_routes::routes(auth_service, token_service.clone()))
-        .nest("/game", game_routes::routes(game_service, token_service, res))
+        .nest("/auth", auth_routes::routes(auth_service))
+        .nest("/game", game_routes::routes(game_service, token_service))
         // Logging
         .layer(
             TraceLayer::new_for_http()

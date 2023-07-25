@@ -1,11 +1,10 @@
-use crate::services::game_service::data_layer::entities::CardEntity;
 
-use super::game_models::Stats;
+use super::game_models::{Stats, CardModel};
 use chrono::{DateTime, FixedOffset};
 use serde::{self, Serialize};
 
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub enum RiddleStatus {
     Correct(QuestReward),
     Incorrect,
@@ -17,10 +16,10 @@ pub enum MonsterStatus {
     Defeated(Option<QuestReward>),
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct QuestReward {
     pub item_idxs: Vec<i64>,
-    pub card: Option<CardEntity>,
+    pub card: Option<CardModel>,
 }
 
 
@@ -42,6 +41,7 @@ pub struct RiddleModel<'a> {
     pub text: &'a str,
 }
 
+#[derive(Serialize)]
 pub struct QuestModel {
     pub id: i32,
     pub created_on: DateTime<FixedOffset>,

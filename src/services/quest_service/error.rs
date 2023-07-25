@@ -1,3 +1,4 @@
+use axum::{response::IntoResponse, http::StatusCode};
 use thiserror::Error;
 
 use crate::data_layer_error::DataLayerError;
@@ -15,5 +16,15 @@ pub enum QuestServiceError {
 impl Into<QuestServiceError> for DataLayerError {
     fn into(self) -> QuestServiceError {
         QuestServiceError::DataLayerError(self)
+    }
+}
+
+impl IntoResponse for QuestServiceError {
+    fn into_response(self) -> axum::response::Response {
+        return if let QuestServiceError::DataLayerError(e) = &self {
+            (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
+        } else {
+            (StatusCode::BAD_REQUEST, self.to_string()).into_response()
+        };
     }
 }
