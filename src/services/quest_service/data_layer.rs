@@ -1,11 +1,15 @@
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use axum::async_trait;
 use chrono::{Datelike, Utc};
+use derive_more::Constructor;
+use prisma_client_rust::Direction;
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
 
-use crate::{data_layer_error::Result, models::{quest_models::QuestModel, game_models::CardModel}, resources::game_resources::{BaseStats, EvidenceCardCategories}, prisma::{PrismaClient, quest, user, stats, quest_riddle, user_card}};
+use crate::{data_layer_error::Result, resources::game_resources::{BaseStats, EvidenceCardCategories}, prisma::{PrismaClient, quest, user, stats, quest_riddle, user_card, quest_monster}, services::game_service::models::{CardModel, Stats}};
+
+use super::entities::{QuestMonsterEntity, QuestStateEntity};
 
 #[async_trait]
 pub trait QuestDataLayer : Send + Sync {
@@ -13,13 +17,14 @@ pub trait QuestDataLayer : Send + Sync {
     /// Retrieves the current-day quest (if one exists) of the user specified by `user_id`
     /// Quests are active if they are both not marked as `completed`, and are from the current day.
     /// 
-    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestModel>>;
+    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestStateEntity>>;
     ///
     /// Creates a battle quest for the specified user, by `user_id`.
-    /// If there is already an existing quest for the day and it's not completed,
-    /// this increments the quest level and activates it
+    /// If there is already an existing quest for the day and it's completed,
+    /// this increments the quest level and activates it. If it's not completed
+    /// returns None
     /// 
-    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestModel>;
+    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<Option<QuestStateEntity>>;
     ///
     /// Completes the quest of the user with the given `user_id`
     /// 
@@ -41,47 +46,68 @@ pub trait QuestDataLayer : Send + Sync {
     /// 
     async fn get_quest_riddle_idx(&self, user_id: i32) -> Result<Option<i32>>;
     /// 
-    /// Confirms a new, random evidence card, if any exist that has yet to be confirmed
+    /// Retrieves a new, random evidence card, if any exist that has yet to be confirmed
     /// in the user's collection
     /// 
-    async fn confirm_rand_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
-    ///
-    /// Resets the stats for all users
-    /// 
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<()>;
+    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
 }
 
+#[derive(Constructor)]
 pub struct DbQuestDataLayer {
-    db: PrismaClient
+    db: Arc<PrismaClient>
 }
 
 #[async_trait]
 impl QuestDataLayer for DbQuestDataLayer {
-    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestModel>> {
-        // Get the most recent quest for the user (if one exists)
+    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestStateEntity>> {
+        // Get the most recent, incomplete quest for the user (if one exists)
         let quest = self.db.quest().find_first(vec![quest::user_id::equals(user_id), quest::completed::equals(false)])
+            .order_by(quest::OrderByParam::CreatedOn(Direction::Desc))
             .exec().await.map_err(|e| Box::new(e))?;
 
         if let Some(quest) = quest {
-            // Check if the quest is from today and is not completed - if not, return None. Otherwise, return the quest
+            // Check if the quest is from today - if not, return None. Otherwise, return the quest
             let today = Utc::now().naive_utc();
-            if !quest.completed && quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
-                return Ok(Some(QuestModel { 
-                    id: quest.id, created_on: quest.created_on, user_id: quest.user_id, 
-                    lvl: quest.lvl, quest_type: quest.quest_type, completed: quest.completed
+            if quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
+
+                // Get the monster state for the quest if it's a monster quest
+                let monster_state = self.db.quest_monster().find_first(vec![quest_monster::quest_id::equals(quest.id)])
+                    .with(quest_monster::stats::fetch())
+                    .exec().await.map_err(|e| Box::new(e))?
+                    .and_then(|ms| {
+                        let stats = ms.stats.unwrap();
+                        Some(QuestMonsterEntity {
+                            monster_idx: ms.monster_idx,
+                            stats: Stats::new(stats.health, stats.power, stats.armor, stats.missing_next_turn)
+                        })
+                    });
+
+                // Get the riddle idx for the quest if it's a riddle quest
+                let riddle_idx = self.db.quest_riddle().find_first(vec![quest_riddle::quest_id::equals(quest.id)])
+                    .exec().await.map_err(|e| Box::new(e))?
+                    .and_then(|r| Some(r.riddle_idx));
+
+                return Ok(Some(QuestStateEntity { 
+                    id: quest.id, lvl: quest.lvl, quest_type: quest.quest_type,
+                    monster_state, riddle_idx,
+                    completed: quest.completed
                 }));
             }
         }
 
         Ok(None)
     }
-    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestModel> {
+    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<Option<QuestStateEntity>> {
         // Determine if the user has a daily quest already
         let daily_quest = self.get_active_user_quest(user_id).await?;
         let mut lvl = 1;
 
         // If there is a daily quest and it's completed, create new quest and set lvl to incremented value
         if let Some(daily_quest) = daily_quest {
+            // Return None if the quest has not been completed yet
+            if !daily_quest.completed {
+                return Ok(None);
+            }
             self.db.quest().update(quest::UniqueWhereParam::IdEquals(daily_quest.id), vec![quest::completed::set(true)])
                 .exec().await.map_err(|e| Box::new(e))?;
 
@@ -92,11 +118,11 @@ impl QuestDataLayer for DbQuestDataLayer {
         self.db.quest().create(quest_type, user::id::equals(user_id), vec![quest::lvl::set(lvl)])
             .exec().await.map_err(|e| Box::new(e))?;
 
-        Ok(self.get_active_user_quest(user_id).await?.unwrap())
+        Ok(Some(self.get_active_user_quest(user_id).await?.unwrap()))
     }
 
     async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()> {
-        let stats = self.db.stats().create(stats.health, stats.magicka, stats.armor, stats.wisdom, stats.reflex, false, vec![])
+        let stats = self.db.stats().create(stats.health, stats.armor, false, vec![])
             .exec().await.map_err(|e| Box::new(e))?;
         self.db.quest_monster().create(monster_idx, quest::id::equals(quest_id), stats::id::equals(stats.id), vec![])
             .exec().await.map_err(|e| Box::new(e))?;
@@ -144,15 +170,27 @@ impl QuestDataLayer for DbQuestDataLayer {
     }
 
     async fn complete_quest(&self, user_id: i32) -> Result<()> {
-        self.db.quest().update_many(
-            vec![quest::user_id::equals(user_id), quest::completed::equals(false)],
+        // Get the quest's id
+        let quest_id = self.db.quest().find_first(vec![quest::user_id::equals(user_id)])
+            .exec().await.map_err(|e| Box::new(e))?.unwrap().id;
+
+        // Update the quest as completed
+        self.db.quest().update(
+            quest::UniqueWhereParam::IdEquals(quest_id),
             vec![quest::completed::set(true)]
         )
             .exec().await.map_err(|e| Box::new(e))?;
+
+        // Delete the linked monster/riddle quest
+        self.db.quest_monster().delete(quest_monster::UniqueWhereParam::QuestIdEquals(quest_id))
+            .exec().await.map_err(|e| Box::new(e))?;
+        self.db.quest_riddle().delete(quest_riddle::UniqueWhereParam::QuestIdEquals(quest_id))
+            .exec().await.map_err(|e| Box::new(e))?;
+
         Ok(())
     }
 
-    async fn confirm_rand_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
+    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
         let mut rng = StdRng::from_entropy();
 
         // Create an iterator of all permutations of cat idx to card idx
@@ -170,25 +208,5 @@ impl QuestDataLayer for DbQuestDataLayer {
         // Choose a random cat and card idx that isn't in the confirmed collection
         let choice = card_cat_pairs.filter(|pair| !conf_cat_card_idxs.contains(pair)).choose(&mut rng);
         Ok(choice.and_then(|choice| Some(CardModel { cat_idx: choice.0, card_idx: choice.1 })))
-    }
-
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<()> {
-        // Get all user stats ids
-        let stats_ids = self.db.user().find_many(vec![]).with(user::state::fetch())
-            .exec().await.map_err(|e| Box::new(e))?
-            .iter().map(|user| user.state.as_ref().unwrap().as_ref().unwrap().stats_id).collect();
-
-        // Update all found stats
-        self.db.stats().update_many(vec![stats::id::in_vec(stats_ids)], vec![
-            stats::health::set(base_stats.health),
-            stats::magicka::set(base_stats.magicka),
-            stats::armor::set(base_stats.armor),
-            stats::wisdom::set(base_stats.wisdom),
-            stats::reflex::set(base_stats.reflex),
-            stats::missing_next_turn::set(false),
-        ])
-            .exec().await.map_err(|e| Box::new(e))?;
-
-        Ok(())
-    }
+    } 
 }

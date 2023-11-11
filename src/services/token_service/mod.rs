@@ -1,6 +1,6 @@
 pub mod error;
+pub mod models;
 pub mod settings;
-pub mod dtos;
 
 use std::collections::BTreeMap;
 
@@ -14,9 +14,9 @@ use jwt::{SignWithKey, VerifyWithKey};
 use lazy_static::lazy_static;
 use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
-use tower_cookies::Cookie;
 
-use self::{settings::TokenSettings, dtos::TokensDto, error::{Result, TokenError}};
+
+use self::{settings::TokenSettings, error::{Result, TokenError}, models::AuthTokensModel};
 
 const REFRESH_TOKEN_LENGTH: usize = 128;
 
@@ -28,7 +28,7 @@ lazy_static! {
 }
 
 pub trait TokenService: Send + Sync {
-    fn generate_auth_tokens(&self, user_id: i32) -> TokensDto;
+    fn generate_auth_tokens(&self, user_id: i32) -> AuthTokensModel;
     fn verify_access_token(&self, access_token: String) -> Result<i32>;
 }
 
@@ -42,7 +42,7 @@ impl TokenService for CoreTokenService {
     /// Using the given `info`, generates a JWT and a series of series of
     /// random bytes representing a refresh token.
     ///
-    fn generate_auth_tokens(&self, user_id: i32) -> TokensDto {
+    fn generate_auth_tokens(&self, user_id: i32) -> AuthTokensModel {
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha26>");
 
@@ -55,9 +55,9 @@ impl TokenService for CoreTokenService {
         let access_token = claims.sign_with_key(&key).expect("error signing jwt key");
         let refresh_token = generate_random_bytes();
 
-        TokensDto {
+        AuthTokensModel {
             access_token,
-            refr_token: create_cookie(refresh_token),
+            refresh_token,
         }
     }
 
@@ -159,9 +159,3 @@ mod tests {
     }
 }
 
-fn create_cookie(refr_token: String) -> Cookie<'static> {
-    // Create the refresh token cookie
-    let mut cookie = Cookie::new("refresh-token", refr_token);
-    cookie.set_http_only(true);
-    cookie
-}

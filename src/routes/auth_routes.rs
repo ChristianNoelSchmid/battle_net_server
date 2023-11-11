@@ -6,11 +6,11 @@ use axum::{
     Json, routing::{put, post}, Router
 };
 
-use tower_cookies::Cookies;
-
-use crate::services::{auth_service::{AuthService, error::AuthServiceError}};
+use tower_cookies::{Cookies, Cookie};
 
 use serde::{Deserialize, Serialize};
+
+use crate::services::auth_service::{AuthService, error::AuthServiceError};
 
 ///
 /// Payload for creating a Church User
@@ -67,7 +67,7 @@ async fn login(
         .try_accept_creds(model.email, model.pwd)
         .await
         .and_then(|tokens| {
-            cookies.add(tokens.refr_token);
+            cookies.add(create_cookie(tokens.refresh_token));
             Ok(Json(tokens.access_token))
         })
 }
@@ -84,10 +84,17 @@ async fn refresh(
         Some(refr_token) => {
             let refr_token = refr_token.value().to_string();
             let tokens = auth_service.try_accept_refresh(refr_token.clone()).await?;
-            cookies.add(tokens.refr_token);
+            cookies.add(create_cookie(tokens.refresh_token));
 
             Ok(Json(tokens.access_token))
         }
         None => Err(AuthServiceError::CookieNotFound),
     };
+}
+
+fn create_cookie(refr_token: String) -> Cookie<'static> {
+    // Create the refresh token cookie
+    let mut cookie = Cookie::new("refresh-token", refr_token);
+    cookie.set_http_only(true);
+    cookie
 }

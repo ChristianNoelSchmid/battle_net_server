@@ -1,23 +1,54 @@
 [{
     "name": "Wilfred, the Esteemed Wizard",
     "level": 2,
-    "spell_tags": [],
     "stats": {
         "health": 10,
         "magicka": 50,
         "reflex": 5,
         "wisdom": 10,
         "armor": 2
-    }
+    },
+    "pow_dmg": [
+        [1, 2],
+        [2, 3],
+        [3, 5],
+        [5, 7]
+    ],
+    "attack_flv_texts": [
+        "Wilfred dives his hand into his robe, preparing to fling powder at you.",
+        "Wilfred begins to chant a spell. He's about to attack.",
+        "Wilfred waves his hands sporadically. He's casting a terrible rune.",
+        "Wilfred reveals a dark orb with a grin. He looks menacing."
+    ],
+    "defend_flv_texts": [
+        "Wilfred summons a shield. He hides behind it."
+    ],
+    "idle_flv_texts": [
+        "Wilfred grins smugly, all defenses recklessly abandoned."
+    ]
 }, {
     "name": "Possesed Nutcracker",
     "level": 1,
-    "spell_tags": [],
+    "pow_dmg": [
+        [1, 3],
+        [2, 6],
+        [3, 7],
+        [4, 10]
+    ],
     "stats": {
         "health": 4,
         "magicka": 0,
         "reflex": 8,
         "wisdom": 2,
         "armor": 8
-    }
+    },
+    "attack_flv_texts": [
+        "{name} bends its knees, poised for a lunge."
+    ],
+    "defend_flv_text": [
+        "{name} steps back and raises its sword in a defensive posture."
+    ],
+    "idle_flv_texts": [
+        "{name} cocks it's head quizzically - it seems confused."
+    ]
 }]

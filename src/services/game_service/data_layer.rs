@@ -5,7 +5,9 @@ use derive_more::Constructor;
 use prisma_client_rust::Direction;
 use rand::{seq::SliceRandom, thread_rng};
 
-use crate::{data_layer_error::Result, prisma::{PrismaClient, user, stats, game_winner, game_target_card, user_card}, resources::game_resources::BaseStats, models::game_models::{MurderedUserModel, CardModel, GameStateModel, UserCardModel}};
+use crate::{data_layer_error::Result, prisma::{PrismaClient, user, stats, game_winner, game_target_card, user_card}, resources::game_resources::BaseStats};
+
+use super::models::{CardModel, MurderedUserModel, GameStateModel, UserCardModel};
 
 const PERSON_CAT_IDX: i32 = 0;
 
@@ -96,8 +98,7 @@ impl GameDataLayer for DbGameDataLayer {
         for id in user_ids {
             // Create the user's stats and add to the database
             let stats = self.db.stats().create(
-                base_stats.health, base_stats.magicka, base_stats.armor, 
-                base_stats.wisdom, base_stats.reflex, false, vec![]
+                base_stats.health, base_stats.armor, false, vec![]
             ).exec().await.map_err(|e| Box::new(e))?;
 
             // Associate the user to their stats
@@ -228,5 +229,5 @@ impl GameDataLayer for DbGameDataLayer {
         }
 
         Ok(())
-    }
+    } 
 }

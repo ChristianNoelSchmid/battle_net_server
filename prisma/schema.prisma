@@ -18,6 +18,7 @@ model User {
   refresh_tokens       RefreshToken[]
   evidence_cards       UserCard[]
   quests               Quest[]
+  items                UserItem[]
   state                UserState?
   GameWinner           GameWinner?
 
@@ -47,10 +48,8 @@ model RefreshToken {
 model Stats {
   id                Int     @default(autoincrement())
   health            Int
-  magicka           Int
   armor             Int
-  wisdom            Int
-  reflex            Int
+  power             Int     @default(1)
   missing_next_turn Boolean
 
   user_states    UserState[]
@@ -85,8 +84,9 @@ model UserCard {
 }
 
 model GameState {
-  id               Int @default(autoincrement())
-  murdered_user_id Int
+  id                 Int      @default(autoincrement())
+  murdered_user_id   Int
+  last_daily_refresh DateTime @default(now())
 
   murdered_user User @relation(fields: [murdered_user_id], references: [id])
 
@@ -103,7 +103,7 @@ model Quest {
   quest_type Int
 
   user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  monster_state QuestMonster?
+  monster       QuestMonster?
   QuestRiddle   QuestRiddle?
 
   @@id(id)
@@ -111,10 +111,12 @@ model Quest {
 }
 
 model QuestMonster {
-  id       Int @default(autoincrement())
-  quest_id Int @unique
-  stats_id Int @unique
+  id          Int @default(autoincrement())
+  quest_id    Int @unique
+  stats_id    Int @unique
   monster_idx Int
+  // The QuestMonster's next action
+  next_action Int @default(0)
 
   quest Quest @relation(fields: [quest_id], references: [id], onDelete: Cascade)
   stats Stats @relation(fields: [stats_id], references: [id], onDelete: Cascade)
@@ -149,4 +151,24 @@ model GameWinner {
 
   @@id(id)
   @@map("game_winners")
+}
+
+model UserItem {
+  id       Int @default(autoincrement())
+  user_id  Int
+  item_idx Int
+
+  user             User              @relation(fields: [user_id], references: [id])
+  UserEquippedItem UserEquippedItem?
+
+  @@id(id)
+  @@map("user_items")
+}
+
+model UserEquippedItem {
+  item_id Int      @unique
+  item    UserItem @relation(fields: [item_id], references: [id])
+
+  @@id(item_id)
+  @@map("user_equipped_items")
 }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json;
+use serde_with::EnumMap;
 use std::{fs, path::PathBuf};
 
 // use crate::effects::EffectType;
@@ -11,7 +12,7 @@ pub struct ResourceLoader {
     pub monsters: Vec<Monster>,
     pub riddles: Vec<Riddle>,
     pub user_base_stats: BaseStats,
-    // pub items: Vec<Item>,
+    pub items: Vec<Item>,
     // pub spells: Vec<Spell>,
 }
 impl ResourceLoader {
@@ -28,9 +29,9 @@ impl ResourceLoader {
         let user_base_stats =
             serde_json::from_str(&Self::get_file_str(&folder_path, "user_base_stats.json"))
                 .expect("Could not parse file into user base stats");
-        /*let items = serde_json::from_str(&Self::get_file_str(&folder_path, "items.json"))
+        let items = serde_json::from_str(&Self::get_file_str(&folder_path, "items.json"))
             .expect("Could not parse file into items");
-        let spells = serde_json::from_str(&Self::get_file_str(&folder_path, "spells.json"))
+        /*let spells = serde_json::from_str(&Self::get_file_str(&folder_path, "spells.json"))
             .expect("Could not parse file into spells");*/
 
         Self {
@@ -39,6 +40,7 @@ impl ResourceLoader {
             monsters,
             riddles,
             user_base_stats,
+            items
             // items,
             // spells,
         }
@@ -57,7 +59,7 @@ pub struct Resources {
     pub avatars: Vec<Avatar>,
     pub monsters: Vec<Monster>,
     pub riddles: Vec<Riddle>,
-    // pub items: Vec<Item>,
+    pub items: Vec<Item>,
     // pub spells: Vec<Spell>,
     pub user_base_stats: BaseStats,
 }
@@ -70,7 +72,7 @@ impl Resources {
             monsters: res_loader.monsters,
             riddles: res_loader.riddles,
             user_base_stats: res_loader.user_base_stats,
-            // items: res_loader.items,
+            items: res_loader.items,
             // spells: res_loader.spells,
         }
     }
@@ -103,27 +105,28 @@ pub struct SabotageCard {
 pub struct Monster {
     pub name: String,
     pub level: i32,
-    pub spell_tags: Vec<String>,
     pub stats: BaseStats,
+    pub pow_dmg: Vec<(i32, i32)>,
+
+    pub attack_flv_texts: Vec<String>,
+    pub defend_flv_texts: Vec<String>,
+    pub idle_flv_texts: Vec<String>
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct BaseStats {
     pub health: i32,
-    pub magicka: i32,
     pub armor: i32,
-    pub wisdom: i32,
-    pub reflex: i32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Riddle {
     pub level: i32,
     pub text: String,
-    pub answers: Vec<String>,
+    pub answer: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum ItemType {
     #[serde(rename = "weapon")]
     Weapon(i64),
@@ -133,8 +136,8 @@ pub enum ItemType {
     Consumable,
 }
 
-/*#[serde_with::serde_as]
-#[derive(Serialize, Deserialize)]
+#[serde_with::serde_as]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Item {
     pub tag: String,
     pub name: String,
@@ -142,13 +145,13 @@ pub struct Item {
     pub item_type: ItemType,
     pub img_path: Option<String>,
 
-    #[serde_as(as = "Option<EnumMap>")]
+    /*#[serde_as(as = "Option<EnumMap>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_self: Option<Vec<EffectType>>,
 
     #[serde_as(as = "Option<EnumMap>")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub effects_other: Option<Vec<EffectType>>,
+    pub effects_other: Option<Vec<EffectType>>,*/
 }
 
 #[serde_with::serde_as]
@@ -158,11 +161,10 @@ pub struct Spell {
     pub name: String,
     pub flavor_text: String,
     pub magicka_cost: i32,
-    #[serde_as(as = "Option<EnumMap>")]
+    /*#[serde_as(as = "Option<EnumMap>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_self: Option<Vec<EffectType>>,
     #[serde_as(as = "Option<EnumMap>")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub effects_other: Option<Vec<EffectType>>,
+    pub effects_other: Option<Vec<EffectType>>,*/
 }
-*/

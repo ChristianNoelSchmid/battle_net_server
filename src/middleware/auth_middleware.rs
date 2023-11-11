@@ -25,7 +25,7 @@ lazy_static! {
 ///
 /// Context for a specific authorized user
 /// 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct AuthContext { pub user_id: i32 }
 
 ///

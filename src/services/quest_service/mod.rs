@@ -1,54 +1,103 @@
 pub mod data_layer;
 pub mod error;
+pub mod models;
+pub mod entities;
 
 use std::sync::Arc;
 
 use axum::async_trait;
+use derive_more::Constructor;
 use rand::{seq::IteratorRandom, thread_rng};
 
-use crate::{
-    models::{
-        game_models::{Stats, CardModel},
-        quest_models::{
-            QuestEventMonster, RiddleModel, QuestReward, RiddleStatus, QuestModel,
-        },
-    },
-    resources::game_resources::Resources,
+use self::models::{
+    QuestReward, RiddleStatus, QuestStateModel, QuestRiddleModel, QuestMonsterModel, QuestConsequences,
 };
+
+use crate::resources::game_resources::Resources;
 
 use self::{error::{Result, QuestServiceError}, data_layer::QuestDataLayer};
 
-use super::auth_service::AuthService;
+use super::game_service::{models::Stats, GameService};
 
 #[async_trait]
-pub trait QuestService : Send + Sync {
+pub trait QuestService: Send + Sync {
     ///
-    /// Generates a new quest of the specified `quest_type` for the user with the given `user_id`
+    /// Generates a new quest of the specified `quest_type` for the user with the given `user_id`.
+    /// Throws Error if the user already has an active quest
     /// 
-    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestModel>;
+    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestStateModel>;
+    ///
+    /// Returns the users current quest, if they are on one. Returns error if the user is not on a quest
+    /// 
+    async fn get_quest(&self, user_id: i32) -> Result<QuestStateModel>;
+    ///
+    /// Performs a guess on a riddle quest, which the user given the `user_id` has active.
+    /// Throws Error if the user is not on a riddle quest
+    /// 
     async fn guess_riddle(&self, user_id: i32, answer: String) -> Result<RiddleStatus>;
-    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardModel>>;
-    async fn reset_users(&self) -> Result<()>;
+    ///
+    /// Completes the quest the user with the given `user_id` is currently on.
+    /// Returns a `QuestReward`, with new confirmed card for user (if not all cards are confirmed already)
+    /// 
+    async fn complete_quest(&self, user_id: i32) -> Result<QuestReward>;
+    ///
+    /// Completes te quest the user with the given `user_id` is currently on.
+    /// Returns a `QuestConsequences`, which include ailments the user now has.  
+    /// 
+    async fn fail_quest(&self, user_id: i32) -> Result<QuestConsequences>;
 }
 
+#[derive(Constructor)]
 pub struct CoreQuestService {
-    auth_service: Arc<dyn AuthService>,
     data_layer: Arc<dyn QuestDataLayer>,
     res: Arc<Resources>,
+    game_service: Arc<dyn GameService>
 }
 
 #[async_trait]
 impl QuestService for CoreQuestService {
-    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestModel> {
+    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestStateModel> {
         let quest = self.data_layer.create_new_user_quest(user_id, quest_type).await.map_err(|e| e.into())?;
+        
+        if let Some(quest) = quest {
+            let (mut monster_state, mut riddle_state) = (None, None);
+            match quest_type {
+                0 => monster_state = Some(self.generate_monster_quest(quest.id, quest.lvl).await?),
+                1 => riddle_state = self.generate_riddle_quest(user_id, quest.id, quest.lvl).await?,
+                _ => { }
+            }
 
-        match quest_type {
-            0 => _ = self.generate_monster_quest(quest.id, quest.lvl).await,
-            1 => _ = self.generate_riddle_quest(user_id, quest.id, quest.lvl).await,
-            _ => { }
+            return Ok(QuestStateModel {
+                lvl: quest.lvl,
+                quest_type: quest.quest_type,
+                monster_state, riddle_state
+            });
+        } 
+
+        Err(QuestServiceError::QuestAlreadyActive)
+    }
+
+    async fn get_quest(&self, user_id: i32) -> Result<QuestStateModel> {
+        let quest = self.data_layer.get_active_user_quest(user_id).await.map_err(|e| e.into())?;
+        match quest {
+            None => return Err(QuestServiceError::UserNotOnQuest),
+            Some(quest) => {
+                let monster_state = quest.monster_state.and_then(
+                    |ms| Some(QuestMonsterModel { 
+                        monster: self.res.monsters[ms.monster_idx as usize].clone(), 
+                        stats: ms.stats 
+                    })
+                );
+                let riddle_state = quest.riddle_idx.and_then(
+                    |idx| Some(QuestRiddleModel { 
+                        text: self.res.riddles[idx as usize].text.clone(), 
+                        answer_len: self.res.riddles[idx as usize].answer.len() as i32
+                    })
+                );
+
+                return Ok(QuestStateModel { lvl: quest.lvl, quest_type: quest.quest_type, monster_state, riddle_state });
+            }
         }
-
-        Ok(quest)
     }
 
     async fn guess_riddle(&self, user_id: i32, answer: String) -> Result<RiddleStatus> {
@@ -63,36 +112,46 @@ impl QuestService for CoreQuestService {
 
         // If the user provides any answer in the collection of answers for the riddle,
         // quest is successfully completed
-        if riddle.answers.iter().any(|ans| ans.to_lowercase() == answer) {
-            // Complete the quest
-            self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
-            // Get a new confirmed card
-            let new_card = self.data_layer.confirm_rand_card(user_id, &self.res.evd_cats_and_cards).await.map_err(|e| e.into())?;
-
-            // Return a successful riddle status, with the quest reward
-            return Ok(
-                RiddleStatus::Correct(
-                    QuestReward {
-                        item_idxs: vec![],
-                        card: new_card
-                    },
-                )
-            );
+        if riddle.answer.to_lowercase() == answer {
+            return Ok(RiddleStatus::Correct(self.complete_quest(user_id).await.map_err(|e| e.into())?));
         }
         return Ok(RiddleStatus::Incorrect);
+    }  
+
+    ///
+    /// Completes the quest the user with the given `user_id` is currently on.
+    /// Returns a `QuestReward`, with new confirmed card for user (if not all cards are confirmed already)
+    /// 
+    async fn complete_quest(&self, user_id: i32) -> Result<QuestReward> {
+        // Complete the quest
+        self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
+        // Get a new confirmed card
+        let new_card = self.data_layer.get_rand_unconfirmed_card(user_id, &self.res.evd_cats_and_cards).await.map_err(|e| e.into())?;
+
+        // Confirm it with the game service
+        if let Some(card) = &new_card {
+            self.game_service.confirm_user_card(user_id, card.cat_idx, card.card_idx).await
+                .map_err(|e| e.into())?;
+        }
+
+        // Return the successful quest reward
+        return Ok(
+            QuestReward {
+                item_idxs: vec![],
+                card: new_card
+            },
+        );
     }
 
-    async fn conf_rand_card(&self, user_id: i32) -> Result<Option<CardModel>> {
-        self.data_layer.confirm_rand_card(user_id, &self.res.evd_cats_and_cards).await.map_err(|e| e.into())
-    }
-
-    async fn reset_users(&self) -> Result<()> {
-        self.data_layer.reset_user_stats(&self.res.user_base_stats).await.map_err(|e| e.into())
+    async fn fail_quest(&self, user_id: i32) -> Result<QuestConsequences> {
+        // Complete the quest
+        self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
+        Ok(QuestConsequences { sab_idxs: vec![] })
     }
 }
 
 impl CoreQuestService {
-    async fn generate_monster_quest(&self, quest_id: i32, quest_level: i32) -> Result<QuestEventMonster> {
+    async fn generate_monster_quest(&self, quest_id: i32, quest_level: i32) -> Result<QuestMonsterModel> {
         // Choose a new monster to fight the player
         let (monster_idx, monster) = self.res.monsters
             .iter().enumerate().filter(|(_, monster)| monster.level == quest_level)
@@ -100,13 +159,13 @@ impl CoreQuestService {
 
         self.data_layer.create_quest_monster(quest_id, monster_idx as i32, monster.stats).await.map_err(|e| e.into())?;
 
-        Ok(QuestEventMonster {
-            monster_idx: monster_idx as i64,
+        Ok(QuestMonsterModel {
+            monster: self.res.monsters[monster_idx].clone(),
             stats: Stats::from_base_stats(monster.stats),
         })
     }
 
-    pub async fn generate_riddle_quest(&self, user_id: i32, quest_id: i32, quest_level: i32) -> Result<Option<RiddleModel>> {
+    pub async fn generate_riddle_quest(&self, user_id: i32, quest_id: i32, quest_level: i32) -> Result<Option<QuestRiddleModel>> {
         let ans_riddle_idxs = self.data_layer.get_user_answered_riddles(user_id).await.map_err(|e| e.into())?;
 
         // Choose a new riddle to give the player,
@@ -116,88 +175,15 @@ impl CoreQuestService {
             .filter(|(idx, riddle)| riddle.level == quest_level && !ans_riddle_idxs.contains(&(*idx as i32)))
             .choose(&mut thread_rng());
 
-        if let Some((idx, riddle)) = idx_and_riddle {
+        return if let Some((idx, riddle)) = idx_and_riddle {
             self.data_layer.create_quest_riddle(quest_id, idx as i32).await.map_err(|e| e.into())?;
 
-            return Ok(Some(RiddleModel {
-                idx: idx as i32,
-                text: &riddle.text,
-            }));
+            Ok(Some(QuestRiddleModel {
+                text: riddle.text.clone(),
+                answer_len: riddle.answer.len() as i32
+            }))
         } else {
-            return Ok(None);
+            Err(QuestServiceError::AllRiddlesCompleted)
         };
     } 
-
-    /*pub fn equip_item(
-        db: &Connection,
-        item_idx: i64,
-        item_slot: i64,
-        user: AuthUser,
-        res: &State<Resources>,
-    ) -> Result<(), &'static str> {
-        // If an item is being equipped, and the user
-        // isn't just requesting unequipping
-        if item_idx != -1 {
-            // Ensure that the item being equipped exists
-            // in the user's inventory, unequipped
-            let mut item_in_inv = query!(
-                db,
-                r"SELECT * FROM user_items WHERE user_id = ? AND item_idx = ? AND equip_slot = NULL",
-                Value::Integer(user.0),
-                Value::Integer(item_idx)
-            );
-            if let Some(_) = item_in_inv.next() {
-                // Select the item that's being replaced, if
-                // on exists in the slot
-                let prev_item_idx: Option<i64> = query!(
-                    db,
-                    "SELECT item_idx FROM user_items WHERE user_id = ? AND equip_slot = ?",
-                    Value::Integer(user.0),
-                    Value::Integer(item_slot)
-                )
-                .map(|row| row.get("item_idx"))
-                .next();
-
-                // If there was an item in that slot, unapply all effects
-                if let Some(prev_item) = prev_item_idx.and_then(|idx| Some(&res.items[idx as usize])) {
-                    if let Some(effects) = prev_item.effects_self.as_ref() {
-                        for effect in effects {
-                            effect.to_effect().remove_from_user(db, user.0);
-                        }
-                    }
-                }
-
-                // Retrieve the new item and apply the effects
-                let new_item = &res.items[item_idx as usize];
-                if let Some(effects) = new_item.effects_self.as_ref() {
-                    for effect in effects {
-                        effect.to_effect().apply_to_user(db, user.0);
-                    }
-                }
-                execute!(
-                    db,
-                    r"UPDATE user_items SET equip_slot = ?
-                    WHERE user_id = ? AND item_idx = ? LIMIT 1",
-                    Value::Integer(item_slot),
-                    Value::Integer(user.0),
-                    Value::Integer(item_idx)
-                );
-                return Ok(());
-            } else {
-                return Err("User does not have item");
-            }
-        // If the slot is only being unequipped, invoke the command
-        } else {
-            execute!(
-                db,
-                r"UPDATE user_items SET equip_slot = NULL
-                WHERE user_id = ? AND item_idx = ? LIMIT 1",
-                Value::Integer(user.0),
-                Value::Integer(item_idx)
-            );
-            return Ok(());
-        }
-    }*/
-
-    
 }

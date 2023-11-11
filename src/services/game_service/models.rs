@@ -1,4 +1,5 @@
 use crate::resources::game_resources::BaseStats;
+use derive_more::Constructor;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -31,13 +32,11 @@ pub struct GameStateModel {
     pub winner_idxs: Option<Vec<i32>>
 }
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Clone, Constructor, Copy)]
 pub struct Stats {
     pub health: i32,
-    pub magicka: i32,
+    pub power: i32,
     pub armor: i32,
-    pub wisdom: i32,
-    pub reflex: i32,
     pub miss_turn: bool,
 }
 
@@ -47,13 +46,6 @@ pub struct MurderedUserModel {
 
 impl Stats {
     pub fn from_base_stats(b_stats: BaseStats) -> Self {
-        Self {
-            health: b_stats.health,
-            magicka: b_stats.magicka,
-            armor: b_stats.armor,
-            wisdom: b_stats.wisdom,
-            reflex: b_stats.reflex,
-            miss_turn: false,
-        }
+        Self::new(b_stats.health, 1, b_stats.armor, false)
     }
 }

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use axum::{Router, routing::{post, get}, extract::{State, FromRef}, Json, middleware};
 
 use crate::{
-    services::{game_service::{GameService, error::Result}, token_service::TokenService},
-    middleware::auth_middleware::{AuthContext, auth_middleware, AdminContext}, models::game_models::{GameStateModel, GameInitialStateModel, UserCardModel},
+    services::{game_service::{GameService, error::Result, models::{GameInitialStateModel, GameStateModel, UserCardModel}}, token_service::TokenService},
+    middleware::auth_middleware::{AuthContext, auth_middleware, AdminContext},
 };
 
 #[derive(Clone, FromRef)]

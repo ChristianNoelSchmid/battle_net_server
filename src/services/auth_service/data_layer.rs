@@ -4,19 +4,21 @@ use axum::async_trait;
 use chrono::{Duration, Utc};
 use derive_more::Constructor;
 
-use crate::{data_layer_error::Result, services::token_service::settings::TokenSettings, prisma::{PrismaClient, user, refresh_token}, models::auth_models::{UserModel, RefrTokenModel}};
+use crate::{data_layer_error::Result, services::token_service::settings::TokenSettings, prisma::{PrismaClient, user, refresh_token}};
+
+use super::models::{UserModel, RefrTokenModel};
 
 #[async_trait]
 pub trait AuthDataLayer : Send + Sync {
     async fn get_user_by_id(&self, user_id: i32) -> Result<Option<UserModel>>;
-    async fn get_user_by_email(&self, email: String) -> Result<Option<UserModel>>;
+    async fn get_user_by_email<'a>(&self, email: &'a str) -> Result<Option<UserModel>>;
 
-    async fn get_refr_token_by_token(&self, token: String) -> Result<Option<RefrTokenModel>>;
+    async fn get_refr_token_by_token<'a>(&self, token: &'a str) -> Result<Option<RefrTokenModel>>;
     async fn get_refr_token_by_id(&self, token: i32) -> Result<Option<RefrTokenModel>>;
-    async fn create_refr_token(&self, user_id: i32, token: String) -> Result<i32>;
-    async fn revoke_refr_token(&self, id: i32, repl_id: Option<i32>, revoked_by: String) -> Result<()>;
+    async fn create_refr_token<'a>(&self, user_id: i32, token: &'a str) -> Result<i32>;
+    async fn revoke_refr_token<'a>(&self, id: i32, repl_id: Option<i32>, revoked_by: &'a str) -> Result<()>;
 
-    async fn create_user(&self, email: String, pwd_hash: String, card_idx: i32) -> Result<()>;
+    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i32) -> Result<()>;
 }
 
 #[derive(Constructor)]
@@ -33,14 +35,14 @@ impl AuthDataLayer for DbAuthDataLayer {
 
         Ok(user.and_then(|user| Some(UserModel { id: user.id, email: user.email, pwd_hash: user.pwd_hash })))
     }
-    async fn get_user_by_email(&self, email: String) -> Result<Option<UserModel>> {
-        let user = self.db.user().find_first(vec![user::email::equals(email)])
+    async fn get_user_by_email<'a>(&self, email: &'a str) -> Result<Option<UserModel>> {
+        let user = self.db.user().find_first(vec![user::email::equals(email.to_string())])
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(user.and_then(|user| Some(UserModel { id: user.id, email: user.email, pwd_hash: user.pwd_hash })))
     }
-    async fn get_refr_token_by_token(&self, token: String) -> Result<Option<RefrTokenModel>> {
-        let refr_token = self.db.refresh_token().find_first(vec![refresh_token::token::equals(token)])
+    async fn get_refr_token_by_token<'a>(&self, token: &'a str) -> Result<Option<RefrTokenModel>> {
+        let refr_token = self.db.refresh_token().find_first(vec![refresh_token::token::equals(token.to_string())])
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(refr_token.and_then(|tkn| Some(RefrTokenModel { 
@@ -57,29 +59,29 @@ impl AuthDataLayer for DbAuthDataLayer {
             repl_id: tkn.replacement_id, revoked_on: tkn.revoked_on 
         })))
     }
-    async fn create_refr_token(&self, user_id: i32, token: String) -> Result<i32> {
+    async fn create_refr_token<'a>(&self, user_id: i32, token: &'a str) -> Result<i32> {
         let now = Utc::now().naive_local();
         let expires = now + Duration::seconds(self.settings.refr_token_lifetime_s);
-        let refr_token = self.db.refresh_token().create(token, user::id::equals(user_id), vec![])
+        let refr_token = self.db.refresh_token().create(token.to_string(), user::id::equals(user_id), vec![])
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(refr_token.id)
     }
-    async fn revoke_refr_token(&self, id: i32, repl_id: Option<i32>, revoked_by: String) -> Result<()> {
+    async fn revoke_refr_token<'a>(&self, id: i32, repl_id: Option<i32>, revoked_by: &'a str) -> Result<()> {
         let now = Utc::now().fixed_offset();
         self.db.refresh_token().update(
             refresh_token::UniqueWhereParam::IdEquals(id),
             vec![
                 refresh_token::revoked_on::set(Some(now)), 
-                refresh_token::revoked_by::set(Some(revoked_by)), 
+                refresh_token::revoked_by::set(Some(revoked_by.to_string())), 
                 refresh_token::replacement_id::set(repl_id)
             ]
         )
             .exec().await.map_err(|e| Box::new(e))?;
         Ok(())
     }
-    async fn create_user(&self, email: String, pwd_hash: String, card_idx: i32) -> Result<()> {
-        self.db.user().create(email, pwd_hash, card_idx, vec![]).exec().await.map_err(|e| Box::new(e))?;
+    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i32) -> Result<()> {
+        self.db.user().create(email.to_string(), pwd_hash.to_string(), card_idx, vec![]).exec().await.map_err(|e| Box::new(e))?;
         Ok(())
     }
 }

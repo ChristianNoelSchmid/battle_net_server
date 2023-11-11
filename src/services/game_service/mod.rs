@@ -1,5 +1,6 @@
 pub mod error;
 pub mod data_layer;
+pub mod models;
 
 use std::sync::Arc;
 
@@ -7,9 +8,9 @@ use axum::async_trait;
 use derive_more::Constructor;
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
 
-use crate::{resources::game_resources::Resources, models::game_models::{CardModel, GameInitialStateModel, GameStateModel}};
+use crate::resources::game_resources::Resources;
 
-use self::{error::{GameServiceError, Result}, data_layer::GameDataLayer};
+use self::{error::{GameServiceError, Result}, data_layer::GameDataLayer, models::{CardModel, GameInitialStateModel, GameStateModel}};
 
 use super::auth_service::AuthService;
 
@@ -43,6 +44,11 @@ pub trait GameService : Send + Sync {
     /// Updates a user's card state with the particular guess-decision of the card specified.
     /// 
     async fn update_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32, guessed: bool) -> Result<()>;
+    ///
+    /// Confirms a card for the given `user_id`, with specific `cat_idx` and `card_idx`
+    /// 
+    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()>;
+
 }
 
 ///
@@ -124,6 +130,10 @@ impl GameService for DbGameService {
             return Err(GameServiceError::GuessOutOfRange);
         }
         self.data_layer.update_user_card(user_id, cat_idx, card_idx, guessed).await.map_err(|e| e.into())?;
+        Ok(())
+    }
+    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()> {
+        self.data_layer.confirm_user_card(user_id, cat_idx, card_idx).await.map_err(|e| e.into())?;
         Ok(())
     }
 }
