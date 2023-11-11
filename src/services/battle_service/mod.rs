@@ -49,7 +49,7 @@ impl BattleService for CoreBattleService {
     async fn defend(&self, user_id: i32) -> Result<RoundResult> {
         self.perform_monster_action(user_id, true).await.map_err(|e| e.into())
     }
-    async fn use_item(&self, user_id: i32, item_idx: i32) -> Result<RoundResult> { 
+    async fn use_item(&self, _user_id: i32, _item_idx: i32) -> Result<RoundResult> { 
         todo!();
     }
 }

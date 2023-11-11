@@ -60,9 +60,14 @@ impl AuthDataLayer for DbAuthDataLayer {
         })))
     }
     async fn create_refr_token<'a>(&self, user_id: i32, token: &'a str) -> Result<i32> {
-        let now = Utc::now().naive_local();
+        let now = Utc::now();
         let expires = now + Duration::seconds(self.settings.refr_token_lifetime_s);
-        let refr_token = self.db.refresh_token().create(token.to_string(), user::id::equals(user_id), vec![])
+
+        let refr_token = self.db.refresh_token().create(
+            token.to_string(), 
+            user::id::equals(user_id), 
+            vec![refresh_token::expires::set(Some(expires.fixed_offset()))]
+        )
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(refr_token.id)

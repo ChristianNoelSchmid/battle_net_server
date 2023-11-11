@@ -10,14 +10,14 @@ pub trait Ai : Send + Sync {
 
 struct WilfredAi;
 impl Ai for WilfredAi {
-    fn next_act(&self, pl_stats: &Stats, monst_stats: &Stats) -> BattleAction {
+    fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> BattleAction {
         BattleAction::Idle
     }
 }
 
 struct NutcrackerAi;
 impl Ai for NutcrackerAi {
-    fn next_act(&self, pl_stats: &Stats, monst_stats: &Stats) -> BattleAction {
+    fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> BattleAction {
         BattleAction::Idle
     }
 }
