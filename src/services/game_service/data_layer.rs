@@ -120,6 +120,10 @@ impl GameDataLayer for DbGameDataLayer {
     }
 
     async fn game_state(&self, user_id: i32) -> Result<Option<GameStateModel>> {
+        // Get the user's info
+        let user = self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
+            .exec().await.map_err(|e| Box::new(e))?.unwrap();
+
         // Determine if the given user has won the game
         let has_won = self.db.game_winner().find_first(vec![game_winner::user_id::equals(user_id)])
             .exec().await.map_err(|e| Box::new(e))?;
@@ -153,10 +157,12 @@ impl GameDataLayer for DbGameDataLayer {
 
         return match game_state {
             Some(game_state) => Ok(Some(GameStateModel { 
-                murdered_user_idx: game_state.murdered_user_id, 
+                murdered_user_id: game_state.murdered_user_id, 
                 target_cards, 
                 user_cards, 
-                winner_idxs 
+                winner_idxs,
+                pl_exhausted: user.exhausted,
+                pl_completed_riddle: user.riddle_quest_completed
             })),
             None => Ok(None)
         };

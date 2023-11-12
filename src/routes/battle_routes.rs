@@ -52,7 +52,14 @@ async fn ws_handler(
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(mut socket: WebSocket, user_id: i32, battle_service: Arc<dyn BattleService>) {
     // Send a Ping message, and return if error occurs (ie. client disconnects immediately)
-    if socket.send(Message::Ping(vec![])).await.is_err() {
+    let setup = battle_service.setup(user_id).await;
+
+    if let Err(e) = setup { 
+        error!("{:?}", e);
+        socket.send(Message::Text("INTERNAL SERVER ERROR".to_string())).await.ok();
+        return;
+    }
+    if socket.send(setup.unwrap().to_ws_msg()).await.is_err() {
         return;
     }
 
@@ -88,21 +95,27 @@ async fn process_message(msg: Message, user_id: i32, battle_service: Arc<dyn Bat
                 if let Ok(val) = msg.parse::<i32>() {
                     match cmd {
                         "Attack" => {
-                            if let Ok(round_res) = battle_service.attack(user_id, val).await {
-                                return if round_res.battle_completed() {
-                                    ControlFlow::Break(Some(round_res.to_ws_msg()))
-                                } else {
-                                    ControlFlow::Continue(Some(round_res.to_ws_msg()))
-                                };
+                            match battle_service.attack(user_id, val).await {
+                                Ok(round_res) => {
+                                    return if round_res.battle_completed() {
+                                        ControlFlow::Break(Some(round_res.to_ws_msg()))
+                                    } else {
+                                        ControlFlow::Continue(Some(round_res.to_ws_msg()))
+                                    };
+                                },
+                                Err(e) => return ControlFlow::Continue(Some(Message::Text(e.to_string())))
                             }
                         }
                         "Item" => {
-                            if let Ok(round_res) = battle_service.use_item(user_id, val).await {
-                                return if round_res.battle_completed() {
-                                    ControlFlow::Break(Some(round_res.to_ws_msg()))
-                                } else {
-                                    ControlFlow::Continue(Some(round_res.to_ws_msg()))
-                                };
+                            match battle_service.use_item(user_id, val).await {
+                                Ok(round_res) => {
+                                    return if round_res.battle_completed() {
+                                        ControlFlow::Break(Some(round_res.to_ws_msg()))
+                                    } else {
+                                        ControlFlow::Continue(Some(round_res.to_ws_msg()))
+                                    };
+                                },
+                                Err(e) => return ControlFlow::Continue(Some(Message::Text(e.to_string())))
                             }
                         }
                         _ => {
@@ -117,12 +130,15 @@ async fn process_message(msg: Message, user_id: i32, battle_service: Arc<dyn Bat
             } else {
                 // If the command does not have arguments
                 match t.as_ref() {
-                    "Defend" => if let Ok(round_res) = battle_service.defend(user_id).await {
-                        return if round_res.battle_completed() {
-                            ControlFlow::Break(Some(round_res.to_ws_msg()))
-                        } else {
-                            ControlFlow::Continue(Some(round_res.to_ws_msg()))
-                        };
+                    "Defend" => {
+                        match battle_service.defend(user_id).await {
+                            Ok(round_res) => return if round_res.battle_completed() {
+                                ControlFlow::Break(Some(round_res.to_ws_msg()))
+                            } else {
+                                ControlFlow::Continue(Some(round_res.to_ws_msg()))
+                            },
+                            Err(e) => return ControlFlow::Continue(Some(Message::Text(e.to_string())))
+                        }
                     },
                     _ => {
                         let err = format!("Could not understand command `{t}`");

@@ -43,9 +43,12 @@
         "armor": 8
     },
     "attack_flv_texts": [
-        "{name} bends its knees, poised for a lunge."
+        "Possesed Nutcracker prepares for a quick swipe of the sword.",
+        "Possesed Nutcracker steps back with sword back, ready to lunge.",
+        "Possesed Nutcracker mechanically stoops for a quick jump forward.",
+        "Possesed Nutcraker is ready to flurry! You see a glint in it's cold eyes."
     ],
-    "defend_flv_text": [
+    "defend_flv_texts": [
         "{name} steps back and raises its sword in a defensive posture."
     ],
     "idle_flv_texts": [

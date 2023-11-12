@@ -19,6 +19,14 @@ pub trait QuestDataLayer : Send + Sync {
     /// 
     async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestStateEntity>>;
     ///
+    /// Retrieves the player's current level. Players level up when they complete monster quests.
+    /// 
+    async fn get_pl_lvl(&self, user_id: i32) -> Result<i32>;
+    ///
+    /// Retrieves whether the player has completed a riddle quest today
+    /// 
+    async fn pl_answered_riddle(&self, user_id: i32) -> Result<bool>;
+    ///
     /// Creates a battle quest for the specified user, by `user_id`.
     /// If there is already an existing quest for the day and it's completed,
     /// this increments the quest level and activates it. If it's not completed
@@ -30,13 +38,21 @@ pub trait QuestDataLayer : Send + Sync {
     /// 
     async fn complete_quest(&self, user_id: i32) -> Result<()>;
     ///
+    /// Exhausts the player, preventing them from performing any more battle quests that day
+    /// 
+    async fn exhaust_pl(&self, user_id: i32) -> Result<()>;
+    ///
+    /// Returns whether the player is exhausted today
+    /// 
+    async fn pl_is_exhausted(&self, user_id: i32) -> Result<bool>;
+    ///
     /// Creates a new monster with the specified stats, and assigns to the given quest
     /// 
     async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()>;
     ///
     /// Retrieves the indices of all riddles the user has answered
     /// 
-    async fn get_user_answered_riddles(&self, user_id: i32) -> Result<Vec<i32>>;
+    async fn get_user_answered_riddle(&self, user_id: i32) -> Result<Vec<i32>>;
     ///
     /// Creates a new riddle with the specified index, and assigns to the given quest
     /// 
@@ -50,6 +66,10 @@ pub trait QuestDataLayer : Send + Sync {
     /// in the user's collection
     /// 
     async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
+    ///
+    /// Deletes the quest with the given id
+    /// 
+    async fn delete_quest(&self, quest_id: i32) -> Result<()>;
 }
 
 #[derive(Constructor)]
@@ -88,7 +108,7 @@ impl QuestDataLayer for DbQuestDataLayer {
                     .and_then(|r| Some(r.riddle_idx));
 
                 return Ok(Some(QuestStateEntity { 
-                    id: quest.id, lvl: quest.lvl, quest_type: quest.quest_type,
+                    id: quest.id, quest_type: quest.quest_type,
                     monster_state, riddle_idx,
                     completed: quest.completed
                 }));
@@ -100,7 +120,6 @@ impl QuestDataLayer for DbQuestDataLayer {
     async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<Option<QuestStateEntity>> {
         // Determine if the user has a daily quest already
         let daily_quest = self.get_active_user_quest(user_id).await?;
-        let mut lvl = 1;
 
         // If there is a daily quest and it's completed, create new quest and set lvl to incremented value
         if let Some(daily_quest) = daily_quest {
@@ -108,17 +127,23 @@ impl QuestDataLayer for DbQuestDataLayer {
             if !daily_quest.completed {
                 return Ok(None);
             }
-            self.db.quest().update(quest::UniqueWhereParam::IdEquals(daily_quest.id), vec![quest::completed::set(true)])
-                .exec().await.map_err(|e| Box::new(e))?;
-
-            lvl = daily_quest.lvl + 1;
         } 
 
         // Create the new quest
-        self.db.quest().create(quest_type, user::id::equals(user_id), vec![quest::lvl::set(lvl)])
+        self.db.quest().create(quest_type, user::id::equals(user_id), vec![])
             .exec().await.map_err(|e| Box::new(e))?;
 
         Ok(Some(self.get_active_user_quest(user_id).await?.unwrap()))
+    }
+
+    async fn get_pl_lvl(&self, user_id: i32) -> Result<i32> {
+        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
+            .exec().await.map_err(|e| Box::new(e))?.unwrap().lvl)
+    }
+
+    async fn pl_answered_riddle(&self, user_id: i32) -> Result<bool> {
+        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
+            .exec().await.map_err(|e| Box::new(e))?.unwrap().riddle_quest_completed)
     }
 
     async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()> {
@@ -130,7 +155,7 @@ impl QuestDataLayer for DbQuestDataLayer {
         Ok(())
     }
 
-    async fn get_user_answered_riddles(&self, user_id: i32) -> Result<Vec<i32>> {
+    async fn get_user_answered_riddle(&self, user_id: i32) -> Result<Vec<i32>> {
         // Get all user completed quests that are riddle quests
         let quest_ids = self.db.quest().find_many(vec![
             quest::user_id::equals(user_id), 
@@ -171,23 +196,39 @@ impl QuestDataLayer for DbQuestDataLayer {
 
     async fn complete_quest(&self, user_id: i32) -> Result<()> {
         // Get the quest's id
-        let quest_id = self.db.quest().find_first(vec![quest::user_id::equals(user_id)])
-            .exec().await.map_err(|e| Box::new(e))?.unwrap().id;
+        let quest = self.db.quest().find_first(vec![quest::user_id::equals(user_id), quest::completed::equals(false)])
+            .exec().await.map_err(|e| Box::new(e))?.unwrap();
 
         // Update the quest as completed
         self.db.quest().update(
-            quest::UniqueWhereParam::IdEquals(quest_id),
+            quest::UniqueWhereParam::IdEquals(quest.id),
             vec![quest::completed::set(true)]
         )
             .exec().await.map_err(|e| Box::new(e))?;
 
-        // Delete the linked monster/riddle quest
-        self.db.quest_monster().delete(quest_monster::UniqueWhereParam::QuestIdEquals(quest_id))
-            .exec().await.map_err(|e| Box::new(e))?;
-        self.db.quest_riddle().delete(quest_riddle::UniqueWhereParam::QuestIdEquals(quest_id))
-            .exec().await.map_err(|e| Box::new(e))?;
+        if quest.quest_type == 0 {
+            // If it was a monster battle, set the user's lvl to 2
+            self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::lvl::set(2)])
+                .exec().await.map_err(|e| Box::new(e))?;
+        } else {
+            // If it was a riddle quest, update the user as completed a riddle today
+            self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::riddle_quest_completed::set(true)])
+                .exec().await.map_err(|e| Box::new(e))?;
+        }
+
 
         Ok(())
+    }
+
+    async fn exhaust_pl(&self, user_id: i32) -> Result<()> {
+        self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::exhausted::set(true)])
+            .exec().await.map_err(|e| Box::new(e))?;
+        Ok(())
+    }
+
+    async fn pl_is_exhausted(&self, user_id: i32) -> Result<bool> {
+        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
+            .exec().await.map_err(|e| Box::new(e))?.unwrap().exhausted)
     }
 
     async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
@@ -209,4 +250,10 @@ impl QuestDataLayer for DbQuestDataLayer {
         let choice = card_cat_pairs.filter(|pair| !conf_cat_card_idxs.contains(pair)).choose(&mut rng);
         Ok(choice.and_then(|choice| Some(CardModel { cat_idx: choice.0, card_idx: choice.1 })))
     } 
+
+    async fn delete_quest(&self, quest_id: i32) -> Result<()> {
+        self.db.quest().delete(quest::UniqueWhereParam::IdEquals(quest_id))
+            .exec().await.map_err(|e| Box::new(e))?;
+        Ok(())
+    }
 }

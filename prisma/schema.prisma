@@ -9,10 +9,13 @@ generator client {
 }
 
 model User {
-  id       Int    @default(autoincrement())
-  email    String @unique
-  pwd_hash String
-  card_idx Int
+  id                     Int     @default(autoincrement())
+  email                  String  @unique
+  pwd_hash               String
+  card_idx               Int
+  lvl                    Int     @default(1)
+  riddle_quest_completed Boolean @default(false)
+  exhausted              Boolean @default(false)
 
   murdered_game_states GameState[]
   refresh_tokens       RefreshToken[]
@@ -97,14 +100,13 @@ model GameState {
 model Quest {
   id         Int      @default(autoincrement())
   user_id    Int
-  lvl        Int      @default(0)
   completed  Boolean  @default(false)
   created_on DateTime @default(now())
   quest_type Int
 
-  user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  monster       QuestMonster?
-  QuestRiddle   QuestRiddle?
+  user        User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  monster     QuestMonster?
+  QuestRiddle QuestRiddle?
 
   @@id(id)
   @@map("quests")
@@ -115,8 +117,10 @@ model QuestMonster {
   quest_id    Int @unique
   stats_id    Int @unique
   monster_idx Int
-  // The QuestMonster's next action
-  next_action Int @default(0)
+
+  // The QuestMonster's next action and flavor text
+  next_action     Int?
+  action_flv_text String?
 
   quest Quest @relation(fields: [quest_id], references: [id], onDelete: Cascade)
   stats Stats @relation(fields: [stats_id], references: [id], onDelete: Cascade)

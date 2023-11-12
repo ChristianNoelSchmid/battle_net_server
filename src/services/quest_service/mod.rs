@@ -51,24 +51,49 @@ pub trait QuestService: Send + Sync {
 pub struct CoreQuestService {
     data_layer: Arc<dyn QuestDataLayer>,
     res: Arc<Resources>,
-    game_service: Arc<dyn GameService>
+    game_service: Arc<dyn GameService>,
 }
 
 #[async_trait]
 impl QuestService for CoreQuestService {
     async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestStateModel> {
         let quest = self.data_layer.create_new_user_quest(user_id, quest_type).await.map_err(|e| e.into())?;
+        let pl_lvl = self.data_layer.get_pl_lvl(user_id).await.map_err(|e| e.into())?;
         
         if let Some(quest) = quest {
             let (mut monster_state, mut riddle_state) = (None, None);
             match quest_type {
-                0 => monster_state = Some(self.generate_monster_quest(quest.id, quest.lvl).await?),
-                1 => riddle_state = self.generate_riddle_quest(user_id, quest.id, quest.lvl).await?,
+                0 => {
+                    if self.data_layer.pl_is_exhausted(user_id).await.map_err(|e| e.into())? {
+                        // If the player is exhausted, delete the quest that was just created
+                        // and return the Error
+                        self.data_layer.delete_quest(quest.id).await.map_err(|e| e.into())?;
+                        return Err(QuestServiceError::PlayerIsExhausted);
+                    }
+                    monster_state = Some(self.generate_monster_quest(quest.id, pl_lvl).await?);
+                }
+                1 => {
+                    match self.generate_riddle_quest(user_id, quest.id, 1).await {
+                        Ok(model) => riddle_state = Some(model),
+                        Err(QuestServiceError::AllRiddlesCompleted) => {
+                            // If all riddles were completed, delete the quest that was just created
+                            // and return the Error
+                            self.data_layer.delete_quest(quest.id).await.map_err(|e| e.into())?;
+                            return Err(QuestServiceError::AllRiddlesCompleted);
+                        },
+                        Err(QuestServiceError::PlayerAlreadyCompletedRiddle) => {
+                            // If player already completed riddle today, 
+                            // delete the quest that was just created and return the Error
+                            self.data_layer.delete_quest(quest.id).await.map_err(|e| e.into())?;
+                            return Err(QuestServiceError::PlayerAlreadyCompletedRiddle);
+                        },
+                        Err(e) => return Err(e)
+                    }
+                }
                 _ => { }
             }
 
             return Ok(QuestStateModel {
-                lvl: quest.lvl,
                 quest_type: quest.quest_type,
                 monster_state, riddle_state
             });
@@ -83,10 +108,7 @@ impl QuestService for CoreQuestService {
             None => return Err(QuestServiceError::UserNotOnQuest),
             Some(quest) => {
                 let monster_state = quest.monster_state.and_then(
-                    |ms| Some(QuestMonsterModel { 
-                        monster: self.res.monsters[ms.monster_idx as usize].clone(), 
-                        stats: ms.stats 
-                    })
+                    |ms| Some(QuestMonsterModel { stats: ms.stats, res_idx: ms.monster_idx })
                 );
                 let riddle_state = quest.riddle_idx.and_then(
                     |idx| Some(QuestRiddleModel { 
@@ -95,7 +117,7 @@ impl QuestService for CoreQuestService {
                     })
                 );
 
-                return Ok(QuestStateModel { lvl: quest.lvl, quest_type: quest.quest_type, monster_state, riddle_state });
+                return Ok(QuestStateModel { quest_type: quest.quest_type, monster_state, riddle_state });
             }
         }
     }
@@ -146,6 +168,7 @@ impl QuestService for CoreQuestService {
     async fn fail_quest(&self, user_id: i32) -> Result<QuestConsequences> {
         // Complete the quest
         self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
+        self.data_layer.exhaust_pl(user_id).await.map_err(|e| e.into())?;
         Ok(QuestConsequences { sab_idxs: vec![] })
     }
 }
@@ -157,16 +180,23 @@ impl CoreQuestService {
             .iter().enumerate().filter(|(_, monster)| monster.level == quest_level)
             .choose(&mut thread_rng()).unwrap();
 
-        self.data_layer.create_quest_monster(quest_id, monster_idx as i32, monster.stats).await.map_err(|e| e.into())?;
+        let monster_idx = monster_idx as i32;
+
+        self.data_layer.create_quest_monster(quest_id, monster_idx, monster.stats).await.map_err(|e| e.into())?;
 
         Ok(QuestMonsterModel {
-            monster: self.res.monsters[monster_idx].clone(),
-            stats: Stats::from_base_stats(monster.stats),
+            res_idx: monster_idx,
+            stats: Stats::from_base_stats(monster.stats)
         })
     }
 
-    pub async fn generate_riddle_quest(&self, user_id: i32, quest_id: i32, quest_level: i32) -> Result<Option<QuestRiddleModel>> {
-        let ans_riddle_idxs = self.data_layer.get_user_answered_riddles(user_id).await.map_err(|e| e.into())?;
+    pub async fn generate_riddle_quest(&self, user_id: i32, quest_id: i32, quest_level: i32) -> Result<QuestRiddleModel> {
+        // Ensure the user hasn't already completed a riddle today
+        if self.data_layer.pl_answered_riddle(user_id).await.map_err(|e| e.into())? {
+            return Err(QuestServiceError::PlayerAlreadyCompletedRiddle)
+        }
+
+        let ans_riddle_idxs = self.data_layer.get_user_answered_riddle(user_id).await.map_err(|e| e.into())?;
 
         // Choose a new riddle to give the player,
         // that the player has not seen
@@ -178,10 +208,10 @@ impl CoreQuestService {
         return if let Some((idx, riddle)) = idx_and_riddle {
             self.data_layer.create_quest_riddle(quest_id, idx as i32).await.map_err(|e| e.into())?;
 
-            Ok(Some(QuestRiddleModel {
+            Ok(QuestRiddleModel {
                 text: riddle.text.clone(),
                 answer_len: riddle.answer.len() as i32
-            }))
+            })
         } else {
             Err(QuestServiceError::AllRiddlesCompleted)
         };

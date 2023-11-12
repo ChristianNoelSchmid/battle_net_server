@@ -1,11 +1,10 @@
 
-use crate::{resources::game_resources::Monster, services::game_service::models::{Stats, CardModel}};
+use crate::services::game_service::models::{Stats, CardModel};
 
 use serde::{self, Serialize};
 
 #[derive(Serialize)]
 pub struct QuestStateModel {
-    pub lvl: i32,
     pub quest_type: i32,
     pub monster_state: Option<QuestMonsterModel>,
     pub riddle_state: Option<QuestRiddleModel>,
@@ -14,8 +13,8 @@ pub struct QuestStateModel {
 
 #[derive(Serialize)]
 pub struct QuestMonsterModel {
-    pub monster: Monster,
-    pub stats: Stats
+    pub res_idx: i32,
+    pub stats: Stats,
 }
 
 #[derive(Serialize)]

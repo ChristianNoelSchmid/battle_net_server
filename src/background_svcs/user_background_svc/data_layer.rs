@@ -55,6 +55,9 @@ impl DataLayer for DbDataLayer {
         ])
             .exec().await.map_err(|e| Box::new(e))?;
 
+        self.db.user().update_many(vec![], vec![user::lvl::set(1), user::exhausted::set(false), user::riddle_quest_completed::set(false)])
+            .exec().await.map_err(|e| Box::new(e))?;
+
         // Update the game_state's last refresh time to now
         self.db.game_state().update_many(vec![], vec![game_state::last_daily_refresh::set(Utc::now().fixed_offset())])
             .exec().await.map_err(|e| Box::new(e))?;

@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod dice;
 
 pub mod background_svcs {
     pub mod user_background_svc;

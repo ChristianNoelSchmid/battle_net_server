@@ -20,6 +20,10 @@ pub enum QuestServiceError {
     QuestAlreadyActive,
     #[error("User has completed all riddles")]
     AllRiddlesCompleted,
+    #[error("Only one riddle quest can be completed a day")]
+    PlayerAlreadyCompletedRiddle,
+    #[error("Player is exhausted, and cannot start a battle quest today.")]
+    PlayerIsExhausted
 }
 
 impl Into<QuestServiceError> for DataLayerError {

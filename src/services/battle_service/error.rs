@@ -13,7 +13,11 @@ pub enum BattleServiceError {
     #[error("An internal server error has occurred")]
     QuestServiceError(QuestServiceError),
     #[error("Quest not found for user {0}")]
-    QuestNotFound(i32)
+    QuestNotFound(i32),
+    #[error("Too much power requested. Request less.")]
+    NotEnoughPower,
+    #[error("Power is out of bounds (please choose from 1-4)")]
+    PowerOutOfRange,
 }
 
 impl Into<BattleServiceError> for DataLayerError {
