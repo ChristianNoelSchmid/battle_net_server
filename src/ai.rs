@@ -10,7 +10,7 @@ pub trait Ai : Send + Sync {
 
 struct WilfredAi;
 impl Ai for WilfredAi {
-    fn next_act(&self, pl_stats: &Stats, monst_stats: &Stats) -> i32 {
+    fn next_act(&self, _pl_stats: &Stats, monst_stats: &Stats) -> i32 {
         if monst_stats.power < 2 {
             return if dice::single(2) == 1 { DEFEND_IDX } else { IDLE_IDX };
         }
