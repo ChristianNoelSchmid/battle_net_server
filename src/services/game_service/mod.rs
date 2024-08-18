@@ -32,22 +32,22 @@ pub trait GameService : Send + Sync {
     /// Retrieves the state of the game, including user-specific 
     /// state.
     /// 
-    async fn game_state<'a>(&self, usr_id: i32) -> Result<GameStateModel>;
+    async fn game_state<'a>(&self, usr_id: i64) -> Result<GameStateModel>;
     ///
     /// Allows the user to guess the target cards with the provided slice of `i64`s.
     /// Returns `true` if the cards are correctly guessed, `false` otherwise.
     /// Guesses are in order of category ID (ie. the first index must be for the 
     /// first category, etc.)
     /// 
-    async fn guess_target_cards<'a>(&self, user_id: i32, guess: &'a [i32]) -> Result<bool>;
+    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<bool>;
     ///
     /// Updates a user's card state with the particular guess-decision of the card specified.
     /// 
-    async fn update_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32, guessed: bool) -> Result<()>;
+    async fn update_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64, guessed: bool) -> Result<()>;
     ///
     /// Confirms a card for the given `user_id`, with specific `cat_idx` and `card_idx`
     /// 
-    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()>;
+    async fn confirm_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64) -> Result<()>;
 
 }
 
@@ -80,7 +80,7 @@ impl GameService for DbGameService {
         let mut target_cards = Vec::new();
         for (cat_idx, cat) in self.res.evd_cats_and_cards.iter().enumerate() {
             let (card_idx, _) = cat.cards.iter().enumerate().choose(&mut rng).expect("Could not find all category cards.");
-            target_cards.push(CardModel { cat_idx: cat_idx as i32, card_idx: card_idx as i32 });
+            target_cards.push(CardModel { cat_idx: cat_idx as i64, card_idx: card_idx as i64 });
         }
 
         let murdered_user = self.data_layer.setup_game(&target_cards, &ubs)
@@ -93,12 +93,12 @@ impl GameService for DbGameService {
         })
     }
 
-    async fn game_state<'a>(&self, user_id: i32) -> Result<GameStateModel> {
+    async fn game_state<'a>(&self, user_id: i64) -> Result<GameStateModel> {
         let state_model = self.data_layer.game_state(user_id).await.map_err(|e| e.into())?;
         state_model.ok_or(GameServiceError::GameNotRunning)
     }
 
-    async fn guess_target_cards<'a>(&self, user_id: i32, guess: &'a [i32]) -> Result<bool> {
+    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<bool> {
         let mut target_cards = self.data_layer.get_target_cards().await.map_err(|e| e.into())?;
 
         if target_cards.is_empty() {
@@ -124,7 +124,7 @@ impl GameService for DbGameService {
         Ok(true)
     }
 
-    async fn update_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32, guessed: bool) -> Result<()> {
+    async fn update_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64, guessed: bool) -> Result<()> {
         if cat_idx as usize >= self.res.evd_cats_and_cards.len() || 
            card_idx as usize >= self.res.evd_cats_and_cards[cat_idx as usize].cards.len() {
             return Err(GameServiceError::GuessOutOfRange);
@@ -132,7 +132,7 @@ impl GameService for DbGameService {
         self.data_layer.update_user_card(user_id, cat_idx, card_idx, guessed).await.map_err(|e| e.into())?;
         Ok(())
     }
-    async fn confirm_user_card(&self, user_id: i32, cat_idx: i32, card_idx: i32) -> Result<()> {
+    async fn confirm_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64) -> Result<()> {
         self.data_layer.confirm_user_card(user_id, cat_idx, card_idx).await.map_err(|e| e.into())?;
         Ok(())
     }

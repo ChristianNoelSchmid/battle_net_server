@@ -35,7 +35,7 @@ async fn game_state(State(game_service): State<Arc<dyn GameService>>, ctx: AuthC
     Ok(Json(game_service.game_state(ctx.user_id).await?))
 }
 
-async fn guess_target_cards(State(game_service): State<Arc<dyn GameService>>, ctx: AuthContext, guess: Json<Vec<i32>>) -> Result<Json<bool>> {
+async fn guess_target_cards(State(game_service): State<Arc<dyn GameService>>, ctx: AuthContext, guess: Json<Vec<i64>>) -> Result<Json<bool>> {
     Ok(Json(game_service.guess_target_cards(ctx.user_id, &guess).await?))
 }
 

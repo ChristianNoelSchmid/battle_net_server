@@ -103,9 +103,9 @@ pub struct SabotageCard {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Monster {
     pub name: String,
-    pub level: i32,
+    pub level: i64,
     pub stats: BaseStats,
-    pub pow_dmg: Vec<(i32, i32)>,
+    pub pow_dmg: Vec<(i64, i64)>,
 
     pub attack_flv_texts: Vec<String>,
     pub defend_flv_texts: Vec<String>,
@@ -114,13 +114,13 @@ pub struct Monster {
 
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct BaseStats {
-    pub health: i32,
-    pub armor: i32,
+    pub health: i64,
+    pub armor: i64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Riddle {
-    pub level: i32,
+    pub level: i64,
     pub text: String,
     pub answer: String,
 }

@@ -10,9 +10,10 @@ use christmas_2022::{
     resources::game_resources::{ResourceLoader, Resources}, 
     services::{token_service::{settings::TokenSettings, CoreTokenService}, 
     auth_service::{data_layer::DbAuthDataLayer, CoreAuthService}, 
-    game_service::{data_layer::DbGameDataLayer, DbGameService}, quest_service::{data_layer::DbQuestDataLayer, CoreQuestService}, battle_service::{CoreBattleService, data_layer::DbBattleDataLayer}}, 
-    routes::{auth_routes, game_routes, quest_routes, battle_routes}, prisma::PrismaClient, background_svcs::user_background_svc::{refresh_daily_async, self},
+    game_service::{data_layer::DbGameDataLayer, DbGameService}, quest_service::{data_layer::DbQuestDataLayer, CoreQuestService}, battle_service::{CoreBattleService, data_layer::DataLayer}}, 
+    routes::{auth_routes, game_routes, quest_routes, battle_routes}, background_svcs::user_background_svc::{refresh_daily_async, self},
 };
+use sqlx::SqlitePool;
 use tower_cookies::CookieManagerLayer;
 use tower_http::trace::{TraceLayer, self};
 use tracing::Level;
@@ -30,11 +31,11 @@ async fn main() {
     tracing_subscriber::fmt().with_target(false).compact().init();
 
     // Setup state
-    let db = Arc::new(PrismaClient::_builder().build().await.unwrap());
+    let db = SqlitePool::connect(&DATABASE_URL).await.unwrap();
     let token_settings: TokenSettings = serde_json::from_str(&fs::read_to_string("./token_settings.json").unwrap()).unwrap();
     let token_service = Arc::new(CoreTokenService::new(token_settings.clone()));
     let res = Arc::new(Resources::from_loader(ResourceLoader::load(String::from("./res"))));
-
+    
     let auth_data_layer = Arc::new(DbAuthDataLayer::new(db.clone(), token_settings.clone()));
     let auth_service = Arc::new(CoreAuthService::new(auth_data_layer.clone(), token_service.clone())); 
 
@@ -44,7 +45,7 @@ async fn main() {
     let quest_data_layer = Arc::new(DbQuestDataLayer::new(db.clone()));
     let quest_service = Arc::new(CoreQuestService::new(quest_data_layer, res.clone(), game_service.clone()));
 
-    let battle_data_layer = Arc::new(DbBattleDataLayer::new(db.clone()));
+    let battle_data_layer = Arc::new(DataLayer::new(db.clone()));
     let battle_service = Arc::new(CoreBattleService::new(battle_data_layer, quest_service.clone(), res.clone()));
 
     let app = Router::new()

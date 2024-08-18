@@ -23,7 +23,7 @@ pub fn routes(quest_service: Arc<dyn QuestService>, token_service: Arc<dyn Token
 
 async fn create_quest(
     State(quest_service): State<Arc<dyn QuestService>>,
-    Path(typ): Path<i32>,
+    Path(typ): Path<i64>,
     ctx: AuthContext,
 ) -> Result<Json<QuestStateModel>> {
     Ok(Json(quest_service.generate_quest(ctx.user_id, typ).await?))

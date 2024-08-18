@@ -1,13 +1,12 @@
 
-use std::{collections::HashSet, sync::Arc};
-
+use std::collections::HashSet;
 use axum::async_trait;
 use chrono::{Datelike, Utc};
 use derive_more::Constructor;
-use prisma_client_rust::Direction;
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
+use sqlx::SqlitePool;
 
-use crate::{data_layer_error::Result, resources::game_resources::{BaseStats, EvidenceCardCategories}, prisma::{PrismaClient, quest, user, stats, quest_riddle, user_card, quest_monster}, services::game_service::models::{CardModel, Stats}};
+use crate::{data_layer_error::Result, resources::game_resources::{BaseStats, EvidenceCardCategories}, services::game_service::models::{CardModel, Stats}};
 
 use super::entities::{QuestMonsterEntity, QuestStateEntity};
 
@@ -17,73 +16,75 @@ pub trait QuestDataLayer : Send + Sync {
     /// Retrieves the current-day quest (if one exists) of the user specified by `user_id`
     /// Quests are active if they are both not marked as `completed`, and are from the current day.
     /// 
-    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestStateEntity>>;
+    async fn get_active_user_quest(&self, user_id: i64) -> Result<Option<QuestStateEntity>>;
     ///
     /// Retrieves the player's current level. Players level up when they complete monster quests.
     /// 
-    async fn get_pl_lvl(&self, user_id: i32) -> Result<i32>;
+    async fn get_pl_lvl(&self, user_id: i64) -> Result<i64>;
     ///
     /// Retrieves whether the player has completed a riddle quest today
     /// 
-    async fn pl_answered_riddle(&self, user_id: i32) -> Result<bool>;
+    async fn pl_answered_riddle(&self, user_id: i64) -> Result<bool>;
     ///
     /// Creates a battle quest for the specified user, by `user_id`.
     /// If there is already an existing quest for the day and it's completed,
     /// this increments the quest level and activates it. If it's not completed
     /// returns None
     /// 
-    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<Option<QuestStateEntity>>;
+    async fn create_new_user_quest(&self, user_id: i64, quest_type: i64) -> Result<Option<QuestStateEntity>>;
     ///
     /// Completes the quest of the user with the given `user_id`
     /// 
-    async fn complete_quest(&self, user_id: i32) -> Result<()>;
+    async fn complete_quest(&self, user_id: i64) -> Result<()>;
     ///
     /// Exhausts the player, preventing them from performing any more battle quests that day
     /// 
-    async fn exhaust_pl(&self, user_id: i32) -> Result<()>;
+    async fn exhaust_pl(&self, user_id: i64) -> Result<()>;
     ///
     /// Returns whether the player is exhausted today
     /// 
-    async fn pl_is_exhausted(&self, user_id: i32) -> Result<bool>;
+    async fn pl_is_exhausted(&self, user_id: i64) -> Result<bool>;
     ///
     /// Creates a new monster with the specified stats, and assigns to the given quest
     /// 
-    async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()>;
+    async fn create_quest_monster(&self, quest_id: i64, monster_idx: i64, stats: BaseStats) -> Result<()>;
     ///
     /// Retrieves the indices of all riddles the user has answered
     /// 
-    async fn get_user_answered_riddle(&self, user_id: i32) -> Result<Vec<i32>>;
+    async fn get_user_answered_riddle(&self, user_id: i64) -> Result<Vec<i64>>;
     ///
     /// Creates a new riddle with the specified index, and assigns to the given quest
     /// 
-    async fn create_quest_riddle(&self, quest_id: i32, riddle_idx: i32) -> Result<()>;
+    async fn create_quest_riddle(&self, quest_id: i64, riddle_idx: i64) -> Result<()>;
     ///
     /// Retrieves the index of the current user's quest's riddle
     /// 
-    async fn get_quest_riddle_idx(&self, user_id: i32) -> Result<Option<i32>>;
+    async fn get_quest_riddle_idx(&self, user_id: i64) -> Result<Option<i64>>;
     /// 
     /// Retrieves a new, random evidence card, if any exist that has yet to be confirmed
     /// in the user's collection
     /// 
-    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
+    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i64, all_cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>>;
     ///
     /// Deletes the quest with the given id
     /// 
-    async fn delete_quest(&self, quest_id: i32) -> Result<()>;
+    async fn delete_quest(&self, quest_id: i64) -> Result<()>;
 }
 
 #[derive(Constructor)]
 pub struct DbQuestDataLayer {
-    db: Arc<PrismaClient>
+    db: SqlitePool
 }
 
 #[async_trait]
 impl QuestDataLayer for DbQuestDataLayer {
-    async fn get_active_user_quest(&self, user_id: i32) -> Result<Option<QuestStateEntity>> {
+    async fn get_active_user_quest(&self, user_id: i64) -> Result<Option<QuestStateEntity>> {
         // Get the most recent, incomplete quest for the user (if one exists)
-        let quest = self.db.quest().find_first(vec![quest::user_id::equals(user_id), quest::completed::equals(false)])
-            .order_by(quest::OrderByParam::CreatedOn(Direction::Desc))
-            .exec().await.map_err(|e| Box::new(e))?;
+        let quest = sqlx::query!("
+            SELECT id, created_on, quest_type, completed FROM quests 
+            WHERE user_id = ? ORDER BY created_on DESC
+            ", user_id
+        ).fetch_optional(&self.db).await?;
 
         if let Some(quest) = quest {
             // Check if the quest is from today - if not, return None. Otherwise, return the quest
@@ -91,21 +92,22 @@ impl QuestDataLayer for DbQuestDataLayer {
             if quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
 
                 // Get the monster state for the quest if it's a monster quest
-                let monster_state = self.db.quest_monster().find_first(vec![quest_monster::quest_id::equals(quest.id)])
-                    .with(quest_monster::stats::fetch())
-                    .exec().await.map_err(|e| Box::new(e))?
-                    .and_then(|ms| {
-                        let stats = ms.stats.unwrap();
-                        Some(QuestMonsterEntity {
-                            monster_idx: ms.monster_idx,
-                            stats: Stats::new(stats.health, stats.power, stats.armor, stats.missing_next_turn)
-                        })
-                    });
+                let monster_state = sqlx::query!("
+                    SELECT ms.monster_idx, ms.stats_id, s.health, s.power, s.armor, s.missing_next_turn 
+                    FROM monster_states ms JOIN stats s ON ms.stats_id = s.id
+                    WHERE quest_id = ?
+                    ", quest.id
+                )
+                    .fetch_optional(&self.db).await?
+                    .and_then(|row| Some(QuestMonsterEntity {
+                        monster_idx: row.monster_idx,
+                        stats: Stats::new(row.health, row.power, row.armor, row.missing_next_turn)
+                    }));
 
                 // Get the riddle idx for the quest if it's a riddle quest
-                let riddle_idx = self.db.quest_riddle().find_first(vec![quest_riddle::quest_id::equals(quest.id)])
-                    .exec().await.map_err(|e| Box::new(e))?
-                    .and_then(|r| Some(r.riddle_idx));
+                let riddle_idx = sqlx::query!("SELECT riddle_idx FROM quest_riddles WHERE quest_id = ?", quest.id)
+                    .fetch_optional(&self.db).await?
+                    .and_then(|row| Some(row.riddle_idx));
 
                 return Ok(Some(QuestStateEntity { 
                     id: quest.id, quest_type: quest.quest_type,
@@ -117,7 +119,7 @@ impl QuestDataLayer for DbQuestDataLayer {
 
         Ok(None)
     }
-    async fn create_new_user_quest(&self, user_id: i32, quest_type: i32) -> Result<Option<QuestStateEntity>> {
+    async fn create_new_user_quest(&self, user_id: i64, quest_type: i64) -> Result<Option<QuestStateEntity>> {
         // Determine if the user has a daily quest already
         let daily_quest = self.get_active_user_quest(user_id).await?;
 
@@ -130,63 +132,79 @@ impl QuestDataLayer for DbQuestDataLayer {
         } 
 
         // Create the new quest
-        self.db.quest().create(quest_type, user::id::equals(user_id), vec![])
-            .exec().await.map_err(|e| Box::new(e))?;
+        sqlx::query!("INSERT INTO quests (user_id, quest_type) VALUES (?, ?)", user_id, quest_type)
+            .execute(&self.db).await?;
 
         Ok(Some(self.get_active_user_quest(user_id).await?.unwrap()))
     }
 
-    async fn get_pl_lvl(&self, user_id: i32) -> Result<i32> {
-        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
-            .exec().await.map_err(|e| Box::new(e))?.unwrap().lvl)
+    async fn get_pl_lvl(&self, user_id: i64) -> Result<i64> {
+        Ok(
+            sqlx::query!("SELECT lvl FROM users WHERE id = ?", user_id)
+                .fetch_one(&self.db).await?.lvl
+        )
     }
 
-    async fn pl_answered_riddle(&self, user_id: i32) -> Result<bool> {
-        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
-            .exec().await.map_err(|e| Box::new(e))?.unwrap().riddle_quest_completed)
+    async fn pl_answered_riddle(&self, user_id: i64) -> Result<bool> {
+        Ok(
+            sqlx::query!("SELECT riddle_quest_completed FROM users WHERE id = ?", user_id)
+                .fetch_one(&self.db).await?.riddle_quest_completed
+        )
     }
 
-    async fn create_quest_monster(&self, quest_id: i32, monster_idx: i32, stats: BaseStats) -> Result<()> {
-        let stats = self.db.stats().create(stats.health, stats.armor, false, vec![])
-            .exec().await.map_err(|e| Box::new(e))?;
-        self.db.quest_monster().create(monster_idx, quest::id::equals(quest_id), stats::id::equals(stats.id), vec![])
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn create_quest_monster(&self, quest_id: i64, monster_idx: i64, stats: BaseStats) -> Result<()> {
+        let stats_id = sqlx::query!(
+            "INSERT INTO stats (health, armor, missing_next_turn) VALUES (?, ?, FALSE)", 
+            stats.health, stats.armor
+        ).execute(&self.db).await?.last_insert_rowid();
+        
+        sqlx::query!("
+            INSERT INTO monster_states (monster_idx, quest_id, stats_id)
+            VALUES (?, ?, ?)
+            ", monster_idx, quest_id, stats_id
+        ).execute(&self.db).await?;
 
         Ok(())
     }
 
-    async fn get_user_answered_riddle(&self, user_id: i32) -> Result<Vec<i32>> {
+    async fn get_user_answered_riddle(&self, user_id: i64) -> Result<Vec<i64>> {
         // Get all user completed quests that are riddle quests
-        let quest_ids = self.db.quest().find_many(vec![
-            quest::user_id::equals(user_id), 
-            quest::completed::equals(true),
-            quest::quest_type::equals(1)
-        ])
-            .exec().await.map_err(|e| Box::new(e))?
+        let quest_ids: Vec<i64> = sqlx::query!(
+            "SELECT id FROM quests WHERE user_id = ? AND quest_type = 1 AND completed = TRUE", 
+            user_id
+        )
+            .fetch_all(&self.db).await?
             .iter().map(|q| q.id).collect();
 
+        // Format the quest ids for the query
+        let quest_ids_fmt = quest_ids.iter().map(|id| format!("{}", id)).collect::<Vec<String>>().join(",");
+
         // Get all riddle idxs using the riddle quest ids
-        let riddle_idxs = self.db.quest_riddle().find_many(
-            vec![quest_riddle::quest_id::in_vec(quest_ids)]
+        let riddle_idxs: Vec<i64> = sqlx::query!(
+            "SELECT riddle_idx FROM quest_riddles WHERE quest_id IN (?)", 
+            quest_ids_fmt
         )
-            .exec().await.map_err(|e| Box::new(e))?
+            .fetch_all(&self.db).await?
             .iter().map(|r| r.riddle_idx).collect();
 
         Ok(riddle_idxs)
     }
 
-    async fn create_quest_riddle(&self, quest_id: i32, riddle_idx: i32) -> Result<()> {
-        self.db.quest_riddle().create(riddle_idx, quest::id::equals(quest_id), vec![])
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn create_quest_riddle(&self, quest_id: i64, riddle_idx: i64) -> Result<()> {
+        sqlx::query!(
+            "INSERT INTO quest_riddles (quest_id, riddle_idx) VALUES (?, ?)", 
+            quest_id, riddle_idx
+        )
+            .execute(&self.db).await?;
         Ok(())
     }
 
-    async fn get_quest_riddle_idx(&self, user_id: i32) -> Result<Option<i32>> {
+    async fn get_quest_riddle_idx(&self, user_id: i64) -> Result<Option<i64>> {
         let quest = self.get_active_user_quest(user_id).await?;
         if let Some(quest) = quest {
             if quest.quest_type == 1 {
-                let riddle_idx = self.db.quest_riddle().find_first(vec![quest_riddle::quest_id::equals(quest.id)])
-                    .exec().await.map_err(|e| Box::new(e))?.unwrap().riddle_idx;
+                let riddle_idx = sqlx::query!("SELECT riddle_idx FROM quest_riddles WHERE quest_id = ?", quest.id)
+                    .fetch_one(&self.db).await?.riddle_idx;
 
                 return Ok(Some(riddle_idx));
             }
@@ -194,66 +212,70 @@ impl QuestDataLayer for DbQuestDataLayer {
         Ok(None)
     }
 
-    async fn complete_quest(&self, user_id: i32) -> Result<()> {
+    async fn complete_quest(&self, user_id: i64) -> Result<()> {
         // Get the quest's id
-        let quest = self.db.quest().find_first(vec![quest::user_id::equals(user_id), quest::completed::equals(false)])
-            .exec().await.map_err(|e| Box::new(e))?.unwrap();
+        let quest = sqlx::query!(
+            "SELECT id, quest_type FROM quests WHERE user_id = ? AND completed = FALSE", 
+            user_id
+        )  
+            .fetch_one(&self.db).await?;
 
         // Update the quest as completed
-        self.db.quest().update(
-            quest::UniqueWhereParam::IdEquals(quest.id),
-            vec![quest::completed::set(true)]
-        )
-            .exec().await.map_err(|e| Box::new(e))?;
+        sqlx::query!("UPDATE quests SET completed = TRUE WHERE id = ?", quest.id)
+            .execute(&self.db).await?;
 
         if quest.quest_type == 0 {
             // If it was a monster battle, set the user's lvl to 2
-            self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::lvl::set(2)])
-                .exec().await.map_err(|e| Box::new(e))?;
+            sqlx::query!("UPDATE users SET lvl = 2 WHERE id = ?", user_id)
+                .execute(&self.db).await?;
         } else {
             // If it was a riddle quest, update the user as completed a riddle today
-            self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::riddle_quest_completed::set(true)])
-                .exec().await.map_err(|e| Box::new(e))?;
+            sqlx::query!("UPDATE users SET riddle_quest_completed = TRUE WHERE id = ?", user_id)
+                .execute(&self.db).await?;
         }
 
 
         Ok(())
     }
 
-    async fn exhaust_pl(&self, user_id: i32) -> Result<()> {
-        self.db.user().update(user::UniqueWhereParam::IdEquals(user_id), vec![user::exhausted::set(true)])
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn exhaust_pl(&self, user_id: i64) -> Result<()> {
+        sqlx::query!("UPDATE users SET exhausted = TRUE WHERE id = ?", user_id)
+            .execute(&self.db).await?;
         Ok(())
     }
 
-    async fn pl_is_exhausted(&self, user_id: i32) -> Result<bool> {
-        Ok(self.db.user().find_unique(user::UniqueWhereParam::IdEquals(user_id))
-            .exec().await.map_err(|e| Box::new(e))?.unwrap().exhausted)
+    async fn pl_is_exhausted(&self, user_id: i64) -> Result<bool> {
+        Ok(
+            sqlx::query!("SELECT exhausted FROM users WHERE id = ?", user_id)
+                .fetch_one(&self.db).await?.exhausted
+        )
     }
 
-    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i32, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
+    async fn get_rand_unconfirmed_card<'a>(&self, user_id: i64, cards: &'a [EvidenceCardCategories]) -> Result<Option<CardModel>> {
         let mut rng = StdRng::from_entropy();
 
         // Create an iterator of all permutations of cat idx to card idx
         let card_cat_pairs = cards.iter().enumerate()
-            .flat_map(|(cat_idx, cat)| (0..cat.cards.len()).map(move |card_idx| (cat_idx as i32, card_idx as i32)));
+            .flat_map(|(cat_idx, cat)| (0..cat.cards.len()).map(move |card_idx| (cat_idx as i64, card_idx as i64)));
 
         // Get all confirmed user cards, convert into 2-ples of cat and card idxs
         // and collect into a HashSet
-        let conf_cat_card_idxs = self.db.user_card()
-            .find_many(vec![user_card::user_id::equals(user_id), user_card::confirmed::equals(true)])
-            .exec().await.map_err(|e| Box::new(e))?
-            .iter().map(|conf_card| (conf_card.cat_idx, conf_card.card_idx))
-            .collect::<HashSet<(i32, i32)>>();
+        let conf_cat_card_idxs = sqlx::query!(
+            "SELECT cat_idx, card_idx FROM user_cards WHERE user_id = ? AND confirmed = TRUE", 
+            user_id
+        )
+            .fetch_all(&self.db).await?
+            .iter().map(|card| (card.cat_idx, card.card_idx))
+            .collect::<HashSet<(i64, i64)>>();
         
         // Choose a random cat and card idx that isn't in the confirmed collection
         let choice = card_cat_pairs.filter(|pair| !conf_cat_card_idxs.contains(pair)).choose(&mut rng);
         Ok(choice.and_then(|choice| Some(CardModel { cat_idx: choice.0, card_idx: choice.1 })))
     } 
 
-    async fn delete_quest(&self, quest_id: i32) -> Result<()> {
-        self.db.quest().delete(quest::UniqueWhereParam::IdEquals(quest_id))
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn delete_quest(&self, quest_id: i64) -> Result<()> {
+        sqlx::query!("DELETE FROM quests WHERE id = ?", quest_id)
+            .execute(&self.db).await?;
         Ok(())
     }
 }

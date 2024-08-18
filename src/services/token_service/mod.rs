@@ -28,8 +28,17 @@ lazy_static! {
 }
 
 pub trait TokenService: Send + Sync {
-    fn generate_auth_tokens(&self, user_id: i32) -> AuthTokensModel;
-    fn verify_access_token(&self, access_token: String) -> Result<i32>;
+    ///
+    /// Using the given `info`, generates a JWT and a series of series of
+    /// random bytes representing a refresh token.
+    ///
+    fn generate_auth_tokens(&self, user_id: i64) -> AuthTokensModel;
+
+    ///
+    /// Verifies a JWT `token`, and returns the corresponding user ID from the its content section with successful verification.
+    /// Returns the associated user ID, or `Error` in the event of unsuccessful verification
+    ///
+    fn verify_access_token(&self, access_token: String) -> Result<i64>;
 }
 
 #[derive(Clone, Constructor)]
@@ -38,11 +47,7 @@ pub struct CoreTokenService {
 }
 
 impl TokenService for CoreTokenService {
-    ///
-    /// Using the given `info`, generates a JWT and a series of series of
-    /// random bytes representing a refresh token.
-    ///
-    fn generate_auth_tokens(&self, user_id: i32) -> AuthTokensModel {
+    fn generate_auth_tokens(&self, user_id: i64) -> AuthTokensModel {
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha26>");
 
@@ -61,11 +66,7 @@ impl TokenService for CoreTokenService {
         }
     }
 
-    ///
-    /// Verifies a JWT `token`, and returns the `AuthInfo` from the its content section with successful verification.
-    /// Returns the associated `jwt` `Error` in the event of unsuccessful verification
-    ///
-    fn verify_access_token(&self, token: String) -> Result<i32> {
+    fn verify_access_token(&self, token: String) -> Result<i64> {
         // Convert the JWT_SECRET env variable into a Hmac hasher
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha256>");
@@ -80,9 +81,9 @@ impl TokenService for CoreTokenService {
                 if Utc::now() > DateTime::parse_from_rfc3339(&claims["expires"]).unwrap() {
                     return Err(TokenError::TokenStale);
 
-                // Otherwise, return Ok with the AuthInfo from the token
+                // Otherwise, return Ok with the user ID from the token
                 } else {
-                    return Ok(claims.remove("user_id").unwrap().parse::<i32>().unwrap());
+                    return Ok(claims.remove("user_id").unwrap().parse::<i64>().unwrap());
                 }
             },
             Err(e) => Err(TokenError::JwtError(e))

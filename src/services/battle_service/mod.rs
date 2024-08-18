@@ -18,8 +18,8 @@ pub mod data_layer;
 pub mod error;
 pub mod models;
 
-const PL_DMG: [(i32, i32);4] = [(2, 3), (4, 7), (6, 12), (8, 16)];
-const MAX_POWER: i32 = 4;
+const PL_DMG: [(i64, i64);4] = [(2, 3), (4, 7), (6, 12), (8, 16)];
+const MAX_POWER: i64 = 4;
 
 #[async_trait]
 pub trait BattleService : Send + Sync {
@@ -27,10 +27,10 @@ pub trait BattleService : Send + Sync {
     /// Initializes the battle, or sends the current battle to the player
     /// on initial connection.
     /// 
-    async fn setup(&self, user_id: i32) -> Result<RoundResult>;
-    async fn attack(&self, user_id: i32, power: i32) -> Result<RoundResult>;
-    async fn defend(&self, user_id: i32) -> Result<RoundResult>;
-    async fn use_item(&self, user_id: i32, item_idx: i32) -> Result<RoundResult>;
+    async fn setup(&self, user_id: i64) -> Result<RoundResult>;
+    async fn attack(&self, user_id: i64, power: i64) -> Result<RoundResult>;
+    async fn defend(&self, user_id: i64) -> Result<RoundResult>;
+    async fn use_item(&self, user_id: i64, item_idx: i64) -> Result<RoundResult>;
 }
 
 #[derive(Constructor)]
@@ -42,7 +42,7 @@ pub struct CoreBattleService {
 
 #[async_trait]
 impl BattleService for CoreBattleService {
-    async fn setup(&self, user_id: i32) -> Result<RoundResult> {
+    async fn setup(&self, user_id: i64) -> Result<RoundResult> {
         let (mut pl_stats, mut monst_stats) = self.data_layer.get_pl_and_monst_stats(user_id).await.map_err(|e| e.into())?;
         let monster_state = self.data_layer.get_monst_state(user_id).await.map_err(|e| e.into())?;
         let next_action;
@@ -66,7 +66,7 @@ impl BattleService for CoreBattleService {
         Ok(RoundResult::Next { pl_stats, monst_stats, next_action, pl_dmg_dealt: 0 })
     }
 
-    async fn attack(&self, user_id: i32, power: i32) -> Result<RoundResult> { 
+    async fn attack(&self, user_id: i64, power: i64) -> Result<RoundResult> { 
         let pl_power = self.data_layer.get_pl_power(user_id).await.map_err(|e| e.into())?;
         // Check that the player has enough power
         if pl_power < power {
@@ -77,7 +77,7 @@ impl BattleService for CoreBattleService {
         }
 
         let dmg_rng = PL_DMG[(power -  1) as usize];
-        let dmg = (thread_rng().next_u32() as i32) % (dmg_rng.1 - dmg_rng.0);
+        let dmg = (thread_rng().next_u32() as i64) % (dmg_rng.1 - dmg_rng.0);
         let dmg = dmg_rng.0 + dmg;
 
         let (dmg, defeated) = self.data_layer.dmg_monst(user_id, power, dmg).await.map_err(|e| e.into())?;
@@ -93,16 +93,16 @@ impl BattleService for CoreBattleService {
         }
     }
 
-    async fn defend(&self, user_id: i32) -> Result<RoundResult> {
+    async fn defend(&self, user_id: i64) -> Result<RoundResult> {
         self.perform_monster_action(user_id, true, 0).await.map_err(|e| e.into())
     }
-    async fn use_item(&self, _user_id: i32, _item_idx: i32) -> Result<RoundResult> { 
+    async fn use_item(&self, _user_id: i64, _item_idx: i64) -> Result<RoundResult> { 
         todo!();
     }
 }
 
 impl CoreBattleService {
-    pub fn get_action_flv_txt<'a>(&self, monst_stats: &Stats, monst_res: &'a Monster, action: i32) -> &'a str {
+    pub fn get_action_flv_txt<'a>(&self, monst_stats: &Stats, monst_res: &'a Monster, action: i64) -> &'a str {
         return match action {
             data_layer::ATTACK_IDX => monst_res.attack_flv_texts[(monst_stats.power - 1) as usize].as_str(),
             data_layer::DEFEND_IDX => {
@@ -119,18 +119,18 @@ impl CoreBattleService {
     ///
     /// Returns the amount of damage the monster does this turn, given the info
     /// 
-    fn get_monster_dmg(&self, monst_stats: &Stats, monst_res: &Monster, pl_defd: bool) -> i32 {
+    fn get_monster_dmg(&self, monst_stats: &Stats, monst_res: &Monster, pl_defd: bool) -> i64 {
         let rng = monst_res.pow_dmg[(monst_stats.power - 1) as usize];
-        let dmg = (thread_rng().next_u32() % (rng.1 - rng.0) as u32) as i32;
+        let dmg = (thread_rng().next_u32() % (rng.1 - rng.0) as u32) as i64;
 
-        return if pl_defd { rng.0 + dmg } else { ((rng.0 + dmg) as f32 / 2.0) as i32 };
+        return if pl_defd { rng.0 + dmg } else { ((rng.0 + dmg) as f32 / 2.0) as i64 };
     }
     
     ///
     /// Performs the monster's action, damaging the player if attacking,
     /// and generating its next action
     /// 
-    async fn perform_monster_action(&self, user_id: i32, pl_defd: bool, pl_dmg_dealt: i32) -> Result<RoundResult> {
+    async fn perform_monster_action(&self, user_id: i64, pl_defd: bool, pl_dmg_dealt: i64) -> Result<RoundResult> {
         // Get the current state of the Monster, and current player and Monster Stats
         let (pl_stats, monst_stats) = self.data_layer.get_pl_and_monst_stats(user_id).await.map_err(|e| e.into())?;
         let monst_state = self.data_layer.get_monst_state(user_id).await.map_err(|e| e.into())?;
@@ -148,7 +148,7 @@ impl CoreBattleService {
         }
         // Increment the player and monster's power by 1
         self.data_layer.increment_pl_pow(user_id, MAX_POWER).await.map_err(|e| e.into())?;
-        self.data_layer.increment_monst_pow(monst_state.db_id, monst_res.pow_dmg.len() as i32).await.map_err(|e| e.into())?;
+        self.data_layer.increment_monst_pow(monst_state.db_id, monst_res.pow_dmg.len() as i64).await.map_err(|e| e.into())?;
 
         // Determine the monster's next action, and new Stats
         let (pl_stats, monst_stats) = self.data_layer.get_pl_and_monst_stats(user_id).await.map_err(|e| e.into())?;

@@ -25,7 +25,7 @@ pub async fn refresh_daily_async(data_layer: Arc<dyn DataLayer>, res: Arc<Resour
         let last_update = data_layer.get_last_user_refr().await.map_err(|e| e.into())?;
 
         if let Some(last_update) = last_update {
-            let last_update = timezone.from_utc_datetime(&last_update.naive_utc());
+            let last_update = timezone.from_utc_datetime(&last_update);
             if now.num_days_from_ce() > last_update.num_days_from_ce() {
                 let ids = data_layer.reset_user_stats(&res.user_base_stats).await.map_err(|e| e.into())?;
                 info!("Refreshed user stats @{}. Ids: {:?}", now, ids);

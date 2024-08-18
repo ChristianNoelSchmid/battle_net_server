@@ -3,10 +3,10 @@ datasource db {
   url      = "file:./app.db"
 }
 
-generator client {
-  provider = "cargo prisma"
-  output   = "../src/prisma.rs"
-}
+//generator client {
+//  provider = "cargo prisma"
+//  output   = "../src/prisma.rs"
+//}
 
 model User {
   id                     Int     @default(autoincrement())
@@ -30,17 +30,17 @@ model User {
 }
 
 model RefreshToken {
-  id             Int       @default(autoincrement())
-  user_id        Int
-  replacement_id Int?      @unique
-  created_on     DateTime  @default(now())
-  expires        DateTime?
-  token          String
-  revoked_on     DateTime?
-  revoked_by     String?
+  id         Int       @default(autoincrement())
+  user_id    Int
+  repl_id    Int?      @unique
+  created_on DateTime  @default(now())
+  expires    DateTime?
+  token      String
+  revoked_on DateTime?
+  revoked_by String?
 
   user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  next_token     RefreshToken? @relation("RefreshTokenChain", fields: [replacement_id], references: [id], onDelete: Cascade)
+  next_token     RefreshToken? @relation("RefreshTokenChain", fields: [repl_id], references: [id], onDelete: Cascade)
   previous_token RefreshToken? @relation("RefreshTokenChain")
 
   @@id(id)
@@ -53,7 +53,7 @@ model Stats {
   health            Int
   armor             Int
   power             Int     @default(1)
-  missing_next_turn Boolean
+  missing_next_turn Boolean @default(false)
 
   user_states    UserState[]
   quest_monsters QuestMonster[]

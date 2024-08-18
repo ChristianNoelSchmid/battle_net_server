@@ -25,26 +25,26 @@ pub trait QuestService: Send + Sync {
     /// Generates a new quest of the specified `quest_type` for the user with the given `user_id`.
     /// Throws Error if the user already has an active quest
     /// 
-    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestStateModel>;
+    async fn generate_quest(&self, user_id: i64, quest_type: i64) -> Result<QuestStateModel>;
     ///
     /// Returns the users current quest, if they are on one. Returns error if the user is not on a quest
     /// 
-    async fn get_quest(&self, user_id: i32) -> Result<QuestStateModel>;
+    async fn get_quest(&self, user_id: i64) -> Result<QuestStateModel>;
     ///
     /// Performs a guess on a riddle quest, which the user given the `user_id` has active.
     /// Throws Error if the user is not on a riddle quest
     /// 
-    async fn guess_riddle(&self, user_id: i32, answer: String) -> Result<RiddleStatus>;
+    async fn guess_riddle(&self, user_id: i64, answer: String) -> Result<RiddleStatus>;
     ///
     /// Completes the quest the user with the given `user_id` is currently on.
     /// Returns a `QuestReward`, with new confirmed card for user (if not all cards are confirmed already)
     /// 
-    async fn complete_quest(&self, user_id: i32) -> Result<QuestReward>;
+    async fn complete_quest(&self, user_id: i64) -> Result<QuestReward>;
     ///
     /// Completes te quest the user with the given `user_id` is currently on.
     /// Returns a `QuestConsequences`, which include ailments the user now has.  
     /// 
-    async fn fail_quest(&self, user_id: i32) -> Result<QuestConsequences>;
+    async fn fail_quest(&self, user_id: i64) -> Result<QuestConsequences>;
 }
 
 #[derive(Constructor)]
@@ -56,7 +56,7 @@ pub struct CoreQuestService {
 
 #[async_trait]
 impl QuestService for CoreQuestService {
-    async fn generate_quest(&self, user_id: i32, quest_type: i32) -> Result<QuestStateModel> {
+    async fn generate_quest(&self, user_id: i64, quest_type: i64) -> Result<QuestStateModel> {
         let quest = self.data_layer.create_new_user_quest(user_id, quest_type).await.map_err(|e| e.into())?;
         let pl_lvl = self.data_layer.get_pl_lvl(user_id).await.map_err(|e| e.into())?;
         
@@ -102,7 +102,7 @@ impl QuestService for CoreQuestService {
         Err(QuestServiceError::QuestAlreadyActive)
     }
 
-    async fn get_quest(&self, user_id: i32) -> Result<QuestStateModel> {
+    async fn get_quest(&self, user_id: i64) -> Result<QuestStateModel> {
         let quest = self.data_layer.get_active_user_quest(user_id).await.map_err(|e| e.into())?;
         match quest {
             None => return Err(QuestServiceError::UserNotOnQuest),
@@ -113,7 +113,7 @@ impl QuestService for CoreQuestService {
                 let riddle_state = quest.riddle_idx.and_then(
                     |idx| Some(QuestRiddleModel { 
                         text: self.res.riddles[idx as usize].text.clone(), 
-                        answer_len: self.res.riddles[idx as usize].answer.len() as i32
+                        answer_len: self.res.riddles[idx as usize].answer.len() as i64
                     })
                 );
 
@@ -122,7 +122,7 @@ impl QuestService for CoreQuestService {
         }
     }
 
-    async fn guess_riddle(&self, user_id: i32, answer: String) -> Result<RiddleStatus> {
+    async fn guess_riddle(&self, user_id: i64, answer: String) -> Result<RiddleStatus> {
         // Lowercase answer for string-matching
         let answer = answer.to_lowercase();
         // Get the user's riddle quest index. Throw error if one isn't found
@@ -144,7 +144,7 @@ impl QuestService for CoreQuestService {
     /// Completes the quest the user with the given `user_id` is currently on.
     /// Returns a `QuestReward`, with new confirmed card for user (if not all cards are confirmed already)
     /// 
-    async fn complete_quest(&self, user_id: i32) -> Result<QuestReward> {
+    async fn complete_quest(&self, user_id: i64) -> Result<QuestReward> {
         // Complete the quest
         self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
         // Get a new confirmed card
@@ -165,7 +165,7 @@ impl QuestService for CoreQuestService {
         );
     }
 
-    async fn fail_quest(&self, user_id: i32) -> Result<QuestConsequences> {
+    async fn fail_quest(&self, user_id: i64) -> Result<QuestConsequences> {
         // Complete the quest
         self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
         self.data_layer.exhaust_pl(user_id).await.map_err(|e| e.into())?;
@@ -174,13 +174,13 @@ impl QuestService for CoreQuestService {
 }
 
 impl CoreQuestService {
-    async fn generate_monster_quest(&self, quest_id: i32, quest_level: i32) -> Result<QuestMonsterModel> {
+    async fn generate_monster_quest(&self, quest_id: i64, quest_level: i64) -> Result<QuestMonsterModel> {
         // Choose a new monster to fight the player
         let (monster_idx, monster) = self.res.monsters
             .iter().enumerate().filter(|(_, monster)| monster.level == quest_level)
             .choose(&mut thread_rng()).unwrap();
 
-        let monster_idx = monster_idx as i32;
+        let monster_idx = monster_idx as i64;
 
         self.data_layer.create_quest_monster(quest_id, monster_idx, monster.stats).await.map_err(|e| e.into())?;
 
@@ -190,7 +190,7 @@ impl CoreQuestService {
         })
     }
 
-    pub async fn generate_riddle_quest(&self, user_id: i32, quest_id: i32, quest_level: i32) -> Result<QuestRiddleModel> {
+    pub async fn generate_riddle_quest(&self, user_id: i64, quest_id: i64, quest_level: i64) -> Result<QuestRiddleModel> {
         // Ensure the user hasn't already completed a riddle today
         if self.data_layer.pl_answered_riddle(user_id).await.map_err(|e| e.into())? {
             return Err(QuestServiceError::PlayerAlreadyCompletedRiddle)
@@ -202,15 +202,15 @@ impl CoreQuestService {
         // that the player has not seen
         let idx_and_riddle = self.res.riddles
             .iter().enumerate()
-            .filter(|(idx, riddle)| riddle.level == quest_level && !ans_riddle_idxs.contains(&(*idx as i32)))
+            .filter(|(idx, riddle)| riddle.level == quest_level && !ans_riddle_idxs.contains(&(*idx as i64)))
             .choose(&mut thread_rng());
 
         return if let Some((idx, riddle)) = idx_and_riddle {
-            self.data_layer.create_quest_riddle(quest_id, idx as i32).await.map_err(|e| e.into())?;
+            self.data_layer.create_quest_riddle(quest_id, idx as i64).await.map_err(|e| e.into())?;
 
             Ok(QuestRiddleModel {
                 text: riddle.text.clone(),
-                answer_len: riddle.answer.len() as i32
+                answer_len: riddle.answer.len() as i64
             })
         } else {
             Err(QuestServiceError::AllRiddlesCompleted)

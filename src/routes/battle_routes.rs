@@ -50,7 +50,7 @@ async fn ws_handler(
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, user_id: i32, battle_service: Arc<dyn BattleService>) {
+async fn handle_socket(mut socket: WebSocket, user_id: i64, battle_service: Arc<dyn BattleService>) {
     // Send a Ping message, and return if error occurs (ie. client disconnects immediately)
     let setup = battle_service.setup(user_id).await;
 
@@ -86,13 +86,13 @@ async fn handle_socket(mut socket: WebSocket, user_id: i32, battle_service: Arc<
 }
 
 /// helper to print contents of messages to stdout. Has special treatment for Close.
-async fn process_message(msg: Message, user_id: i32, battle_service: Arc<dyn BattleService>) -> ControlFlow<Option<Message>, Option<Message>> {
+async fn process_message(msg: Message, user_id: i64, battle_service: Arc<dyn BattleService>) -> ControlFlow<Option<Message>, Option<Message>> {
     match msg {
         Message::Text(t) => {
             // Parse the client command from the possible choices in the battle
             if let Some((cmd, msg)) = t.split_once("::") {
-                // If command contains an argument, ensure it is a u32
-                if let Ok(val) = msg.parse::<i32>() {
+                // If command contains an argument, ensure it is a i64
+                if let Ok(val) = msg.parse::<i64>() {
                     match cmd {
                         "Attack" => {
                             match battle_service.attack(user_id, val).await {

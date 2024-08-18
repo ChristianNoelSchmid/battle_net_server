@@ -28,7 +28,7 @@ lazy_static! {
 pub trait AuthService: Send + Sync {
     async fn try_accept_creds(&self, email: String, pwd: String) -> Result<AuthTokensModel>;
     async fn try_accept_refresh(&self, refr_token: String) -> Result<AuthTokensModel>;
-    async fn create_new_user(&self, email: String, pwd: String, card_idx: i32) -> Result<()>;
+    async fn create_new_user(&self, email: String, pwd: String, card_idx: usize) -> Result<()>;
 }
 
 #[derive(Clone, Constructor)]
@@ -110,15 +110,15 @@ impl AuthService for CoreAuthService {
         return Err(AuthServiceError::TokenDoesNotExist);
     }
     
-    async fn create_new_user(&self, email: String, pwd: String, card_idx: i32) -> Result<()> {
+    async fn create_new_user(&self, email: String, pwd: String, card_idx: usize) -> Result<()> {
         let pwd_hash = argon2::hash_encoded(pwd.as_bytes(), SALT.as_bytes(), &Config::default()).unwrap();
-        self.data_layer.create_user(&email, &pwd_hash, card_idx).await.map_err(|e| e.into())?;
+        self.data_layer.create_user(&email, &pwd_hash, card_idx as i64).await.map_err(|e| e.into())?;
 
         Ok(())
     }
 }
 
-async fn revoke_token(refr_token: RefrTokenModel, data_layer: &Arc<dyn AuthDataLayer>) -> data_layer_error::Result<i32> {
+async fn revoke_token(refr_token: RefrTokenModel, data_layer: &Arc<dyn AuthDataLayer>) -> data_layer_error::Result<i64> {
     let mut desc_token = refr_token;
 
     // Traverse down the descendent token line, finding the

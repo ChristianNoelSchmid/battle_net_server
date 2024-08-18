@@ -11,9 +11,6 @@ pub mod middleware {
     pub mod auth_middleware;
 }
 
-#[allow(warnings, unused)]
-pub mod prisma;
-
 pub mod routes {
     pub mod game_routes;
     pub mod quest_routes;

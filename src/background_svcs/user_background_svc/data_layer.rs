@@ -1,9 +1,8 @@
-use std::sync::Arc;
-
 use axum::async_trait;
-use chrono::{FixedOffset, DateTime, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
+use sqlx::SqlitePool;
 
-use crate::{data_layer_error::Result, resources::game_resources::BaseStats, prisma::{PrismaClient, user, stats, game_state}};
+use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
 
 
 #[async_trait]
@@ -12,55 +11,62 @@ pub trait DataLayer : Send + Sync {
     /// Retrieves the last DateTime at which user stats were refreshed.
     /// Returns None if there is no active game
     /// 
-    async fn get_last_user_refr(&self) -> Result<Option<DateTime<FixedOffset>>>;
+    async fn get_last_user_refr(&self) -> Result<Option<NaiveDateTime>>;
     ///
     /// Resets all users stats to the given `base_stats`
     ///
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i32>>;
+    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i64>>;
 }
 
 pub struct DbDataLayer {
-    pub db: Arc<PrismaClient>,
+    pub db: SqlitePool,
 }
 
 #[async_trait]
 impl DataLayer for DbDataLayer {
-    async fn get_last_user_refr(&self) -> Result<Option<DateTime<FixedOffset>>> {
+    async fn get_last_user_refr(&self) -> Result<Option<NaiveDateTime>> {
         // Get the active game state
-        let game_state = self.db.game_state().find_first(vec![]).exec().await.map_err(|e| Box::new(e))?;
+        let last_daily_refresh = sqlx::query!(
+            "SELECT last_daily_refresh FROM game_states"
+        ).fetch_optional(&self.db).await?
+         .and_then(|row| Some(row.last_daily_refresh));
 
-        match game_state {
+        match last_daily_refresh {
             // If there is no game active, return None
             None => Ok(None),
             // If there is, return its last_daily_refresh value
-            Some(game_state) => Ok(Some(game_state.last_daily_refresh))
+            Some(last_daily_refresh) => Ok(Some(last_daily_refresh))
         }
         
     }
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i32>> {
+    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i64>> {
         // Get all user stats ids
-        let stats_ids: Vec<i32> = self.db.user().find_many(vec![]).with(user::state::fetch())
-            .exec().await.map_err(|e| Box::new(e))?
-            // Unwrap outer Option, as we've called fetch for user state
-            .iter().map(|u| u.state.as_ref().unwrap())
-            // Filter by Some, then unwrap, collecting the user's stats IDs
-            // This will exclude users that don't have stats entries
-            .filter(|u| u.is_some()).map(|u| u.as_ref().unwrap().stats_id).collect();
+        let stats_ids = sqlx::query!("
+            SELECT s.id FROM stats s
+            JOIN user_states us ON s.id = us.stats_id
+            WHERE us.stats_id IS NOT NULL
+        ")
+            .fetch_all(&self.db).await?
+            .iter().map(|row| row.id).collect::<Vec<i64>>();
 
         // Update all found stats
-        self.db.stats().update_many(vec![stats::id::in_vec(stats_ids.clone())], vec![
-            stats::health::set(base_stats.health),
-            stats::armor::set(base_stats.armor),
-            stats::missing_next_turn::set(false),
-        ])
-            .exec().await.map_err(|e| Box::new(e))?;
+        let stats_fmt = stats_ids.iter().map(|id| format!("{}", id))
+            .collect::<Vec<String>>().join(",");
 
-        self.db.user().update_many(vec![], vec![user::lvl::set(1), user::exhausted::set(false), user::riddle_quest_completed::set(false)])
-            .exec().await.map_err(|e| Box::new(e))?;
+        sqlx::query!("
+            UPDATE stats SET health = ?, armor = ?, missing_next_turn = FALSE
+            WHERE id IN (?)
+            ", base_stats.health, base_stats.armor, stats_fmt
+        )
+            .execute(&self.db).await?;
+
+        sqlx::query!("UPDATE users SET lvl = 1, exhausted = FALSE, riddle_quest_completed = FALSE")
+            .execute(&self.db).await?;
 
         // Update the game_state's last refresh time to now
-        self.db.game_state().update_many(vec![], vec![game_state::last_daily_refresh::set(Utc::now().fixed_offset())])
-            .exec().await.map_err(|e| Box::new(e))?;
+        let utc_now = Utc::now().naive_utc();
+        sqlx::query!("UPDATE game_states SET last_daily_refresh = ?", utc_now)
+            .execute(&self.db).await?;
 
         Ok(stats_ids)
     }

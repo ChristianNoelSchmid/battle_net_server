@@ -10,7 +10,7 @@ pub struct MonsterState {
     ///
     /// The id of the monster in the database
     /// 
-    pub db_id: i32,
+    pub db_id: i64,
     ///
     /// The index of the monster in the Resources collection
     /// 
@@ -30,7 +30,7 @@ pub struct NextAction {
     ///
     /// The index of the type of action being performed next
     /// 
-    pub idx: i32,
+    pub idx: i64,
     ///
     /// The flavor text of the action being performed
     /// 
@@ -43,17 +43,17 @@ pub enum RoundResult {
     /// Signals that the user won the battle,
     /// providing quest rewards
     /// 
-    Victory { reward: QuestReward, pl_dmg_dealt: i32 },
+    Victory { reward: QuestReward, pl_dmg_dealt: i64 },
     ///
     /// Signals that the user was defeated this round,
     /// providing the monster's damage dealt and sabatogues from losing
     /// 
-    Defeat { monst_dmg: i32, consq: QuestConsequences, pl_dmg_dealt: i32 },
+    Defeat { monst_dmg: i64, consq: QuestConsequences, pl_dmg_dealt: i64 },
     ///
     /// Signals that the round did not complete the battle,
     /// providing all relevant info for the end of round, and next round
     /// 
-    Next { pl_stats: Stats, monst_stats: Stats, next_action: NextAction, pl_dmg_dealt: i32 }
+    Next { pl_stats: Stats, monst_stats: Stats, next_action: NextAction, pl_dmg_dealt: i64 }
 }
 
 impl RoundResult {

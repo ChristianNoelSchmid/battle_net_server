@@ -5,7 +5,7 @@ use serde::{self, Serialize};
 
 #[derive(Serialize)]
 pub struct QuestStateModel {
-    pub quest_type: i32,
+    pub quest_type: i64,
     pub monster_state: Option<QuestMonsterModel>,
     pub riddle_state: Option<QuestRiddleModel>,
 }
@@ -13,14 +13,14 @@ pub struct QuestStateModel {
 
 #[derive(Serialize)]
 pub struct QuestMonsterModel {
-    pub res_idx: i32,
+    pub res_idx: i64,
     pub stats: Stats,
 }
 
 #[derive(Serialize)]
 pub struct QuestRiddleModel {
     pub text: String,
-    pub answer_len: i32
+    pub answer_len: i64
 }
 
 #[derive(Debug, Serialize)]

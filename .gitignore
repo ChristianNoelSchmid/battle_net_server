@@ -1,4 +1,4 @@
 /target
 /src/prisma.rs
 /_prisma-cli/target/
-/prisma/app.db
+/db/app.db

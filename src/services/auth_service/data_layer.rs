@@ -1,92 +1,91 @@
-use std::sync::Arc;
-
 use axum::async_trait;
 use chrono::{Duration, Utc};
 use derive_more::Constructor;
+use sqlx::SqlitePool;
 
-use crate::{data_layer_error::Result, services::token_service::settings::TokenSettings, prisma::{PrismaClient, user, refresh_token}};
+use crate::{data_layer_error::Result, services::token_service::settings::TokenSettings};
 
 use super::models::{UserModel, RefrTokenModel};
 
 #[async_trait]
 pub trait AuthDataLayer : Send + Sync {
-    async fn get_user_by_id(&self, user_id: i32) -> Result<Option<UserModel>>;
+    async fn get_user_by_id(&self, user_id: i64) -> Result<Option<UserModel>>;
     async fn get_user_by_email<'a>(&self, email: &'a str) -> Result<Option<UserModel>>;
 
     async fn get_refr_token_by_token<'a>(&self, token: &'a str) -> Result<Option<RefrTokenModel>>;
-    async fn get_refr_token_by_id(&self, token: i32) -> Result<Option<RefrTokenModel>>;
-    async fn create_refr_token<'a>(&self, user_id: i32, token: &'a str) -> Result<i32>;
-    async fn revoke_refr_token<'a>(&self, id: i32, repl_id: Option<i32>, revoked_by: &'a str) -> Result<()>;
+    async fn get_refr_token_by_id(&self, token: i64) -> Result<Option<RefrTokenModel>>;
+    async fn create_refr_token<'a>(&self, user_id: i64, token: &'a str) -> Result<i64>;
+    async fn revoke_refr_token<'a>(&self, id: i64, repl_id: Option<i64>, revoked_by: &'a str) -> Result<()>;
 
-    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i32) -> Result<()>;
+    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i64) -> Result<()>;
 }
 
 #[derive(Constructor)]
 pub struct DbAuthDataLayer {
-    db: Arc<PrismaClient>,
+    db: SqlitePool,
     settings: TokenSettings
 }
 
 #[async_trait]
 impl AuthDataLayer for DbAuthDataLayer {
-    async fn get_user_by_id(&self, user_id: i32) -> Result<Option<UserModel>> {
-        let user = self.db.user().find_first(vec![user::id::equals(user_id)])
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn get_user_by_id(&self, user_id: i64) -> Result<Option<UserModel>> {
+        let user = sqlx::query_as!(UserModel, 
+            "SELECT id, email, pwd_hash FROM users WHERE id = ?", user_id
+        ).fetch_optional(&self.db).await?;
 
-        Ok(user.and_then(|user| Some(UserModel { id: user.id, email: user.email, pwd_hash: user.pwd_hash })))
+        Ok(user)
     }
     async fn get_user_by_email<'a>(&self, email: &'a str) -> Result<Option<UserModel>> {
-        let user = self.db.user().find_first(vec![user::email::equals(email.to_string())])
-            .exec().await.map_err(|e| Box::new(e))?;
+        let user = sqlx::query_as!(UserModel,
+            "SELECT id, email, pwd_hash FROM users WHERE email = ?", email
+        ).fetch_optional(&self.db).await?;
 
-        Ok(user.and_then(|user| Some(UserModel { id: user.id, email: user.email, pwd_hash: user.pwd_hash })))
+        Ok(user)
     }
     async fn get_refr_token_by_token<'a>(&self, token: &'a str) -> Result<Option<RefrTokenModel>> {
-        let refr_token = self.db.refresh_token().find_first(vec![refresh_token::token::equals(token.to_string())])
-            .exec().await.map_err(|e| Box::new(e))?;
+        let refr_token = sqlx::query_as!(RefrTokenModel, "
+            SELECT id, user_id, token, repl_id, revoked_on 
+            FROM refresh_tokens WHERE token = ?
+            ", token
+        ).fetch_optional(&self.db).await?;
 
-        Ok(refr_token.and_then(|tkn| Some(RefrTokenModel { 
-            id: tkn.id, user_id: tkn.user_id, token: tkn.token, 
-            repl_id: tkn.replacement_id, revoked_on: tkn.revoked_on 
-        })))
+        Ok(refr_token)
     }
-    async fn get_refr_token_by_id(&self, id: i32) -> Result<Option<RefrTokenModel>> {
-        let refr_token = self.db.refresh_token().find_first(vec![refresh_token::id::equals(id)])
-            .exec().await.map_err(|e| Box::new(e))?;
+    async fn get_refr_token_by_id(&self, id: i64) -> Result<Option<RefrTokenModel>> {
+        let refr_token = sqlx::query_as!(RefrTokenModel, "
+            SELECT id, user_id, token, repl_id, revoked_on
+            FROM refresh_tokens WHERE id = ?
+            ", id
+        ).fetch_optional(&self.db).await?;
 
-        Ok(refr_token.and_then(|tkn| Some(RefrTokenModel { 
-            id: tkn.id, user_id: tkn.user_id, token: tkn.token, 
-            repl_id: tkn.replacement_id, revoked_on: tkn.revoked_on 
-        })))
+        Ok(refr_token)
     }
-    async fn create_refr_token<'a>(&self, user_id: i32, token: &'a str) -> Result<i32> {
+    async fn create_refr_token<'a>(&self, user_id: i64, token: &'a str) -> Result<i64> {
         let now = Utc::now();
         let expires = now + Duration::seconds(self.settings.refr_token_lifetime_s);
 
-        let refr_token = self.db.refresh_token().create(
-            token.to_string(), 
-            user::id::equals(user_id), 
-            vec![refresh_token::expires::set(Some(expires.fixed_offset()))]
-        )
-            .exec().await.map_err(|e| Box::new(e))?;
+        let res = sqlx::query!("
+            INSERT INTO refresh_tokens (user_id, expires, token)
+            VALUES (?, ?, ?)
+            ", user_id, expires, token
+        ).execute(&self.db).await?;
 
-        Ok(refr_token.id)
+        Ok(res.last_insert_rowid())
     }
-    async fn revoke_refr_token<'a>(&self, id: i32, repl_id: Option<i32>, revoked_by: &'a str) -> Result<()> {
+    async fn revoke_refr_token<'a>(&self, id: i64, repl_id: Option<i64>, revoked_by: &'a str) -> Result<()> {
         let now = Utc::now().fixed_offset();
-        self.db.refresh_token().update(
-            refresh_token::UniqueWhereParam::IdEquals(id),
-            vec![
-                refresh_token::revoked_on::set(Some(now)), 
-                refresh_token::revoked_by::set(Some(revoked_by.to_string())), 
-                refresh_token::replacement_id::set(repl_id)
-            ]
-        )
-            .exec().await.map_err(|e| Box::new(e))?;
+        sqlx::query!("
+            UPDATE refresh_tokens SET revoked_on = ?, revoked_by = ?, repl_id = ?
+            WHERE id = ?
+            ", now, revoked_by, repl_id, id
+        ).execute(&self.db).await?;
         Ok(())
     }
-    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i32) -> Result<()> {
-        self.db.user().create(email.to_string(), pwd_hash.to_string(), card_idx, vec![]).exec().await.map_err(|e| Box::new(e))?;
+    async fn create_user<'a>(&self, email: &'a str, pwd_hash: &'a str, card_idx: i64) -> Result<()> {
+        sqlx::query!("
+            INSERT INTO users (email, pwd_hash, card_idx) VALUES (?, ?, ?)
+            ", email, pwd_hash, card_idx
+        ).execute(&self.db).await?;
         Ok(())
     }
 }
