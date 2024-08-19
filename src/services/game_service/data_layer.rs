@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 
 use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
 
-use super::models::{CardModel, MurderedUserModel, GameStateModel, UserCardModel};
+use super::models::{CardModel, GameStateModel, MurderedUserModel, Stats, UserCardModel};
 
 const PERSON_CAT_IDX: i32 = 0;
 
@@ -165,12 +165,20 @@ impl GameDataLayer for DbGameDataLayer {
 
         // Get the user's current guessed cards and confirmed cards
         let user_cards = sqlx::query_as!(UserCardModel,
-            "SELECT cat_idx, card_idx, confirmed FROM user_cards WHERE user_id = ?", user_id
+            "SELECT cat_idx, card_idx, confirmed FROM user_cards WHERE user_id = ?", 
+            user_id
         ).fetch_all(&self.db).await?;
-        
+
+        let user_stats = sqlx::query_as!(Stats,
+            "SELECT power, health, armor, missing_next_turn as miss_turn FROM stats WHERE id = ?", 
+            user_id
+        )
+            .fetch_one(&self.db).await?;
+
         Ok(Some(GameStateModel {
             target_cards, 
             user_cards, 
+            user_stats,
             winner_idxs,
             murdered_user_id: murdered_user_id.unwrap(),
             pl_exhausted: user.exhausted,
@@ -180,9 +188,9 @@ impl GameDataLayer for DbGameDataLayer {
 
     async fn get_target_cards(&self) -> Result<Vec<CardModel>> {
         Ok(
-                sqlx::query_as!(CardModel, 
-                    "SELECT cat_idx, card_idx FROM game_target_cards"
-                ).fetch_all(&self.db).await?
+            sqlx::query_as!(CardModel, 
+                "SELECT cat_idx, card_idx FROM game_target_cards"
+            ).fetch_all(&self.db).await?
         )
     }
 

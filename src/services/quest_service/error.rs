@@ -53,6 +53,7 @@ impl IntoResponse for QuestServiceError {
                     return (StatusCode::BAD_REQUEST, gse.to_string()).into_response();
                 }
             },
+            QuestServiceError::UserNotOnQuest => return (StatusCode::NOT_FOUND, self.to_string()).into_response(),
             _ => return (StatusCode::BAD_REQUEST, self.to_string()).into_response()
         }
     }

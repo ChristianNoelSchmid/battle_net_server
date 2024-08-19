@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::NaiveDateTime;
 
 #[derive(Debug, Default)]
 pub struct UserModel { 

@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::services::{quest_service::models::{QuestReward, QuestConsequences}, game_service::models::Stats};
 
-#[derive(Constructor)]
+#[derive(Constructor, Serialize)]
 pub struct MonsterState {
     ///
     /// The id of the monster in the database

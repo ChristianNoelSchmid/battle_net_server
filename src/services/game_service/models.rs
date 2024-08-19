@@ -27,6 +27,7 @@ pub struct GameInitialStateModel {
 #[derive(Serialize)]
 pub struct GameStateModel {
     pub murdered_user_id: i64,
+    pub user_stats: Stats,
     pub user_cards: Vec<UserCardModel>,
     pub target_cards: Option<Vec<CardModel>>,
     pub winner_idxs: Option<Vec<i64>>,
