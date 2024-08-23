@@ -92,7 +92,6 @@ impl BattleService for CoreBattleService {
             self.perform_monster_action(user_id, false, dmg).await.map_err(|e| e.into())
         }
     }
-
     async fn defend(&self, user_id: i64) -> Result<RoundResult> {
         self.perform_monster_action(user_id, true, 0).await.map_err(|e| e.into())
     }

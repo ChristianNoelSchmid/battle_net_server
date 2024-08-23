@@ -3,10 +3,11 @@ use std::{sync::Arc, ops::ControlFlow};
 use axum::{Router, routing::get, middleware, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, FromRef, State}, response::IntoResponse, http::StatusCode};
 use log::error;
 
-use crate::{services::{token_service::TokenService, battle_service::BattleService, quest_service::{QuestService, error::QuestServiceError}}, middleware::auth_middleware::{auth_middleware, AuthContext}};
+use crate::{middleware::auth_middleware::{auth_middleware, AuthContext}, services::{auth_service::{self, AuthService}, battle_service::BattleService, quest_service::{error::QuestServiceError, QuestService}, token_service::TokenService}};
 
 #[derive(Clone, FromRef)]
 pub struct BattleRoutesState {
+    token_service: Arc<dyn TokenService>,
     battle_service: Arc<dyn BattleService>,
     quest_service: Arc<dyn QuestService>,
 }
@@ -15,10 +16,8 @@ pub fn routes(token_service: Arc<dyn TokenService>, quest_service: Arc<dyn Quest
     Router::new()
         // Routes
         .route("/", get(ws_handler))
-        // Auth middleware
-        .layer(middleware::from_fn_with_state(token_service, auth_middleware))
         // State
-        .with_state(BattleRoutesState { battle_service, quest_service })
+        .with_state(BattleRoutesState { token_service, battle_service, quest_service })
 }
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start
@@ -28,30 +27,50 @@ pub fn routes(token_service: Arc<dyn TokenService>, quest_service: Arc<dyn Quest
 /// as well as things from HTTP headers such as user-agent of the browser etc.
 async fn ws_handler(
     ws: WebSocketUpgrade,
-    ctx: AuthContext,
+    State(token_service): State<Arc<dyn TokenService>>,
     State(battle_service): State<Arc<dyn BattleService>>,
-    State(quest_service): State<Arc<dyn QuestService>>
+    State(quest_service): State<Arc<dyn QuestService>>,
 ) -> impl IntoResponse {
-    // Ensure the user is currently on a quest - if not, return BAD REQUEST
-    match quest_service.get_quest(ctx.user_id).await {
-        Err(QuestServiceError::UserNotOnQuest) => {
-            return (StatusCode::BAD_REQUEST, "User does not have a quest active").into_response();
-        }
-        Err(e) => { return e.into_response(); },
-        Ok(quest) => {
-            if quest.monster_state.is_none() {
-                return (StatusCode::BAD_REQUEST, "Only battles use websocket connections").into_response()
-            }
-        }
-    }
+    
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, ctx.user_id, battle_service))
+    ws.on_upgrade(
+        move |socket| handle_socket(socket, token_service, battle_service, quest_service)
+    )
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, user_id: i64, battle_service: Arc<dyn BattleService>) {
-    // Send a Ping message, and return if error occurs (ie. client disconnects immediately)
+async fn handle_socket(
+    mut socket: WebSocket,
+    token_service: Arc<dyn TokenService>, 
+    battle_service: Arc<dyn BattleService>,
+    quest_service: Arc<dyn QuestService>
+) {
+    // Send a Request authorization message, and return if error occurs (ie. client disconnects immediately)
+    let auth_msg = Message::Text("Auth?".to_string());
+    if socket.send(auth_msg).await.is_err() {
+        return;
+    }
+
+    let user_id = match socket.recv().await {
+        Some(Ok(msg)) => Some(token_service.verify_access_token(msg.into_text().unwrap().to_string()).unwrap()),
+        _ => None
+    };
+    if user_id.is_none() {
+        socket.send(Message::Text("Invalid access token".to_string())).await.ok();
+        return;
+    }
+    let user_id = user_id.unwrap();
+
+    // Ensure the user is currently on a quest - if not, return BAD REQUEST
+    if let Err(e) = quest_service.get_quest(user_id).await {
+        if let QuestServiceError::UserNotOnQuest = e {
+            socket.send(Message::Text("User does not have an active battle quest".to_string()))
+                .await.unwrap();
+        }
+        return;
+    }
+
     let setup = battle_service.setup(user_id).await;
 
     if let Err(e) = setup { 
@@ -75,6 +94,7 @@ async fn handle_socket(mut socket: WebSocket, user_id: i64, battle_service: Arc<
                 if let Err(e) = socket.send(msg).await {
                     error!("Error sending message to user_id {user_id}: `{:?}", e);
                 }
+                tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
                 // Break after sending the socket message (if one exists)
                 break;
             },

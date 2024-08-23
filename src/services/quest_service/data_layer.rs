@@ -82,7 +82,7 @@ impl QuestDataLayer for DbQuestDataLayer {
         // Get the most recent, incomplete quest for the user (if one exists)
         let quest = sqlx::query!("
             SELECT id, created_on, quest_type, completed FROM quests 
-            WHERE user_id = ? ORDER BY created_on DESC
+            WHERE user_id = ? AND completed = FALSE ORDER BY created_on DESC
             ", user_id
         ).fetch_optional(&self.db).await?;
 
