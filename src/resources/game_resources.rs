@@ -121,7 +121,7 @@ pub struct BaseStats {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Riddle {
     pub text: String,
-    pub answer: String,
+    pub answers: Vec<String>,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]

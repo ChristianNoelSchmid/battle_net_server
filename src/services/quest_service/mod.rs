@@ -113,7 +113,6 @@ impl QuestService for CoreQuestService {
                 let riddle_state = quest.riddle_idx.and_then(
                     |idx| Some(QuestRiddleModel { 
                         text: self.res.riddles[idx as usize].text.clone(), 
-                        answer_len: self.res.riddles[idx as usize].answer.len() as i64
                     })
                 );
 
@@ -125,6 +124,13 @@ impl QuestService for CoreQuestService {
     async fn guess_riddle(&self, user_id: i64, answer: String) -> Result<RiddleStatus> {
         // Lowercase answer for string-matching
         let answer = answer.to_lowercase();
+        let answer = answer
+            .trim_start()
+            .trim_start_matches("the")
+            .trim_start_matches("a")
+            .trim_start_matches("an")
+            .trim_start();
+
         // Get the user's riddle quest index. Throw error if one isn't found
         // (ie. the user is not on a riddle quest)
         let riddle_idx = self.data_layer.get_quest_riddle_idx(user_id).await.map_err(|e| e.into())?
@@ -134,7 +140,7 @@ impl QuestService for CoreQuestService {
 
         // If the user provides any answer in the collection of answers for the riddle,
         // quest is successfully completed
-        if riddle.answer.to_lowercase() == answer {
+        if riddle.answers.iter().any(|ans| ans.to_lowercase() == answer) {
             return Ok(RiddleStatus::Correct(self.complete_quest(user_id).await.map_err(|e| e.into())?));
         }
         return Ok(RiddleStatus::Incorrect);
@@ -210,7 +216,6 @@ impl CoreQuestService {
 
             Ok(QuestRiddleModel {
                 text: riddle.text.clone(),
-                answer_len: riddle.answer.len() as i64
             })
         } else {
             Err(QuestServiceError::AllRiddlesCompleted)

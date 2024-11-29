@@ -20,7 +20,6 @@ pub struct QuestMonsterModel {
 #[derive(Serialize)]
 pub struct QuestRiddleModel {
     pub text: String,
-    pub answer_len: i64
 }
 
 #[derive(Debug, Serialize)]
