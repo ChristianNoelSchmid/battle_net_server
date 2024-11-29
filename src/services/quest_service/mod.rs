@@ -73,7 +73,7 @@ impl QuestService for CoreQuestService {
                     monster_state = Some(self.generate_monster_quest(quest.id, pl_lvl).await?);
                 }
                 1 => {
-                    match self.generate_riddle_quest(user_id, quest.id, 1).await {
+                    match self.generate_riddle_quest(user_id, quest.id).await {
                         Ok(model) => riddle_state = Some(model),
                         Err(QuestServiceError::AllRiddlesCompleted) => {
                             // If all riddles were completed, delete the quest that was just created
@@ -190,7 +190,7 @@ impl CoreQuestService {
         })
     }
 
-    pub async fn generate_riddle_quest(&self, user_id: i64, quest_id: i64, quest_level: i64) -> Result<QuestRiddleModel> {
+    pub async fn generate_riddle_quest(&self, user_id: i64, quest_id: i64) -> Result<QuestRiddleModel> {
         // Ensure the user hasn't already completed a riddle today
         if self.data_layer.pl_answered_riddle(user_id).await.map_err(|e| e.into())? {
             return Err(QuestServiceError::PlayerAlreadyCompletedRiddle)
@@ -202,7 +202,7 @@ impl CoreQuestService {
         // that the player has not seen
         let idx_and_riddle = self.res.riddles
             .iter().enumerate()
-            .filter(|(idx, riddle)| riddle.level == quest_level && !ans_riddle_idxs.contains(&(*idx as i64)))
+            .filter(|(idx, _)| !ans_riddle_idxs.contains(&(*idx as i64)))
             .choose(&mut thread_rng());
 
         return if let Some((idx, riddle)) = idx_and_riddle {

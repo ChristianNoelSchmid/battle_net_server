@@ -95,7 +95,13 @@ impl GameService for DbGameService {
 
     async fn game_state<'a>(&self, user_id: i64) -> Result<GameStateModel> {
         let state_model = self.data_layer.game_state(user_id).await.map_err(|e| e.into())?;
-        state_model.ok_or(GameServiceError::GameNotRunning)
+        let completed_riddle_count = self.data_layer.get_completed_riddle_count(user_id).await.map_err(|e| e.into())?;
+        state_model.and_then(|mut model| {
+            if completed_riddle_count as usize == self.res.riddles.len() {
+                model.pl_completed_all_riddles = true;
+            }
+            Some(model)
+        }).ok_or(GameServiceError::GameNotRunning)
     }
 
     async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<bool> {

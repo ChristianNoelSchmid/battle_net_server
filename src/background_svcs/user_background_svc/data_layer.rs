@@ -15,7 +15,7 @@ pub trait DataLayer : Send + Sync {
     ///
     /// Resets all users stats to the given `base_stats`
     ///
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i64>>;
+    async fn reset_user_stats(&self, base_stats: &BaseStats) -> Result<()>;
 }
 
 pub struct DbDataLayer {
@@ -39,27 +39,15 @@ impl DataLayer for DbDataLayer {
         }
         
     }
-    async fn reset_user_stats<'a>(&self, base_stats: &'a BaseStats) -> Result<Vec<i64>> {
-        // Get all user stats ids
-        let stats_ids = sqlx::query!("
-            SELECT s.id FROM stats s
-            JOIN user_states us ON s.id = us.stats_id
-            WHERE us.stats_id IS NOT NULL
-        ")
-            .fetch_all(&self.db).await?
-            .iter().map(|row| row.id).collect::<Vec<i64>>();
-
-        // Update all found stats
-        let stats_fmt = stats_ids.iter().map(|id| format!("{}", id))
-            .collect::<Vec<String>>().join(",");
-
-        sqlx::query!("
-            UPDATE stats SET health = ?, armor = ?, missing_next_turn = FALSE
-            WHERE id IN (?)
-            ", base_stats.health, base_stats.armor, stats_fmt
+    async fn reset_user_stats(&self, base_stats: &BaseStats) -> Result<()> {
+        // Reset all stats to their base level
+        sqlx::query!(
+            "UPDATE stats SET health = ?, armor = ?, missing_next_turn = FALSE",
+            base_stats.health, base_stats.armor
         )
             .execute(&self.db).await?;
 
+        // Set all player levels to 1
         sqlx::query!("UPDATE users SET lvl = 1, exhausted = FALSE, riddle_quest_completed = FALSE")
             .execute(&self.db).await?;
 
@@ -68,6 +56,6 @@ impl DataLayer for DbDataLayer {
         sqlx::query!("UPDATE game_states SET last_daily_refresh = ?", utc_now)
             .execute(&self.db).await?;
 
-        Ok(stats_ids)
+        Ok(())
     }
 }

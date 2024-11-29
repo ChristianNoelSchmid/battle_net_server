@@ -43,16 +43,19 @@ pub enum RoundResult {
     /// Signals that the user won the battle,
     /// providing quest rewards
     /// 
+    #[serde(rename="victory")]
     Victory { reward: QuestReward, pl_dmg_dealt: i64 },
     ///
     /// Signals that the user was defeated this round,
     /// providing the monster's damage dealt and sabatogues from losing
     /// 
+    #[serde(rename="defeat")]
     Defeat { monst_dmg: i64, consq: QuestConsequences, pl_dmg_dealt: i64 },
     ///
     /// Signals that the round did not complete the battle,
     /// providing all relevant info for the end of round, and next round
     /// 
+    #[serde(rename="next")]
     Next { pl_stats: Stats, monst_stats: Stats, next_action: NextAction, pl_dmg_dealt: i64 }
 }
 

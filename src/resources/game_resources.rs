@@ -120,7 +120,6 @@ pub struct BaseStats {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Riddle {
-    pub level: i64,
     pub text: String,
     pub answer: String,
 }

@@ -36,7 +36,9 @@ pub struct QuestConsequences {
 
 #[derive(Debug, Serialize)]
 pub enum RiddleStatus {
+    #[serde(rename="correct")]
     Correct(QuestReward),
+    #[serde(rename="incorrect")]
     Incorrect,
 }
 

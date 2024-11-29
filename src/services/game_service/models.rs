@@ -26,13 +26,15 @@ pub struct GameInitialStateModel {
 
 #[derive(Serialize)]
 pub struct GameStateModel {
+    pub user_id: i64,
     pub murdered_user_id: i64,
     pub user_stats: Stats,
     pub user_cards: Vec<UserCardModel>,
     pub target_cards: Option<Vec<CardModel>>,
     pub winner_idxs: Option<Vec<i64>>,
     pub pl_exhausted: bool,
-    pub pl_completed_riddle: bool
+    pub pl_completed_daily_riddle: bool,
+    pub pl_completed_all_riddles: bool
 }
 
 #[derive(Serialize, Clone, Constructor, Copy)]

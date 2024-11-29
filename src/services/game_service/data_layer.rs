@@ -3,7 +3,7 @@ use derive_more::Constructor;
 use rand::{seq::SliceRandom, thread_rng};
 use sqlx::SqlitePool;
 
-use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
+use crate::{data_layer_error::Result, resources::game_resources::BaseStats, services::quest_service};
 
 use super::models::{CardModel, GameStateModel, MurderedUserModel, Stats, UserCardModel};
 
@@ -49,6 +49,7 @@ pub trait GameDataLayer : Send + Sync {
     /// Adds card to user's confirmed set, marked as `confirmed`
     /// 
     async fn confirm_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64) -> Result<()>;
+    async fn get_completed_riddle_count(&self, user_id: i64) -> Result<i64>;
 }
 
 #[derive(Constructor)]
@@ -176,13 +177,15 @@ impl GameDataLayer for DbGameDataLayer {
             .fetch_one(&self.db).await?;
 
         Ok(Some(GameStateModel {
+            user_id,
             target_cards, 
             user_cards, 
             user_stats,
             winner_idxs,
             murdered_user_id: murdered_user_id.unwrap(),
             pl_exhausted: user.exhausted,
-            pl_completed_riddle: user.riddle_quest_completed
+            pl_completed_daily_riddle: user.riddle_quest_completed,
+            pl_completed_all_riddles: false
         }))
     }
 
@@ -267,4 +270,13 @@ impl GameDataLayer for DbGameDataLayer {
 
         Ok(())
     } 
+
+    async fn get_completed_riddle_count(&self, user_id: i64) -> Result<i64> {
+        Ok(
+            sqlx::query!(
+                "SELECT COUNT(*) AS count FROM quests WHERE quest_type = ? AND completed = TRUE AND user_id = ?",
+                2, user_id
+            ).fetch_one(&self.db).await?.count
+        )
+    }
 }

@@ -260,13 +260,20 @@ impl QuestDataLayer for DbQuestDataLayer {
 
         // Get all confirmed user cards, convert into 2-ples of cat and card idxs
         // and collect into a HashSet
-        let conf_cat_card_idxs = sqlx::query!(
+        let mut conf_cat_card_idxs = sqlx::query!(
             "SELECT cat_idx, card_idx FROM user_cards WHERE user_id = ? AND confirmed = TRUE", 
             user_id
         )
             .fetch_all(&self.db).await?
             .iter().map(|card| (card.cat_idx, card.card_idx))
             .collect::<HashSet<(i64, i64)>>();
+        
+        // Map game target cards into confirmed cards - they should
+        // never be chosen!
+        let game_target_cards = sqlx::query!("SELECT * FROM game_target_cards").fetch_all(&self.db).await?;
+        for idxs in game_target_cards.iter() {
+            conf_cat_card_idxs.insert((idxs.cat_idx, idxs.card_idx));
+        }
         
         // Choose a random cat and card idx that isn't in the confirmed collection
         let choice = card_cat_pairs.filter(|pair| !conf_cat_card_idxs.contains(pair)).choose(&mut rng);
