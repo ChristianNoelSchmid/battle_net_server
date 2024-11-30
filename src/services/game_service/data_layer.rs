@@ -82,7 +82,7 @@ impl GameDataLayer for DbGameDataLayer {
         let murdered_user = murdered_user.unwrap();
 
         // Get all other user ids
-        let user_ids: Vec<i64> = users.iter().filter(|u| u.id != murdered_user.id).map(|u| u.id).collect();
+        let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
 
         // Add the murdered user to all users evidence cards (that user is not a target card)
         for id in &user_ids {

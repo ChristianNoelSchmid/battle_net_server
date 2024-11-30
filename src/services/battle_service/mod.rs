@@ -63,7 +63,7 @@ impl BattleService for CoreBattleService {
             next_action = monster_state.next_action.unwrap();
         }
         
-        Ok(RoundResult::Next { pl_stats, monst_stats, next_action, pl_dmg_dealt: 0 })
+        Ok(RoundResult::Next { pl_stats, monst_stats, next_action, pl_dmg_dealt: 0, monst_dmg_dealt: 0, monst_pow_used: 0 })
     }
 
     async fn attack(&self, user_id: i64, power: i64) -> Result<RoundResult> { 
@@ -134,15 +134,18 @@ impl CoreBattleService {
         let (pl_stats, monst_stats) = self.data_layer.get_pl_and_monst_stats(user_id).await.map_err(|e| e.into())?;
         let monst_state = self.data_layer.get_monst_state(user_id).await.map_err(|e| e.into())?;
         let monst_res = &self.res.monsters[monst_state.res_idx];
+        let mut monst_dmg_dealt = 0i64;
+        let mut monst_pow_used = 0i64;
 
         // Have the monster attack the player, and determine if the player is defeated
         if monst_state.next_action.unwrap().idx == ATTACK_IDX {
-            let monst_dmg = self.get_monster_dmg(&monst_stats, &self.res.monsters[monst_state.res_idx], pl_defd);
-            if monst_dmg >= pl_stats.health {
+            monst_dmg_dealt = self.get_monster_dmg(&monst_stats, &self.res.monsters[monst_state.res_idx], pl_defd);
+            monst_pow_used = monst_stats.power;
+            if monst_dmg_dealt >= pl_stats.health {
                 let consq = self.quest_service.fail_quest(user_id).await.map_err(|e| BattleServiceError::QuestServiceError(e))?;
-                return Ok(RoundResult::Defeat { monst_dmg, consq, pl_dmg_dealt })
+                return Ok(RoundResult::Defeat { monst_dmg: monst_dmg_dealt, consq, pl_dmg_dealt, monst_pow_used: monst_stats.power })
             }
-            self.data_layer.dmg_pl(user_id, monst_dmg).await.map_err(|e| e.into())?;
+            self.data_layer.dmg_pl(user_id, monst_dmg_dealt).await.map_err(|e| e.into())?;
             self.data_layer.expend_monst_pow(monst_state.db_id).await.map_err(|e| e.into())?;
         }
         // Increment the player and monster's power by 1
@@ -154,7 +157,7 @@ impl CoreBattleService {
         let next_action = self.get_monster_next_action(monst_res, &pl_stats, &monst_stats);
         self.data_layer.set_monst_next_action(monst_state.db_id, &next_action).await.map_err(|e| e.into())?;
                 
-        return Ok(RoundResult::Next { pl_stats, monst_stats, next_action, pl_dmg_dealt });
+        return Ok(RoundResult::Next { pl_stats, monst_stats, next_action, pl_dmg_dealt, monst_dmg_dealt, monst_pow_used });
     }
 
     fn get_monster_next_action(&self, monst_res: &Monster, pl_stats: &Stats, monst_stats: &Stats) -> NextAction {

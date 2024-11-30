@@ -50,13 +50,13 @@ pub enum RoundResult {
     /// providing the monster's damage dealt and sabatogues from losing
     /// 
     #[serde(rename="defeat")]
-    Defeat { monst_dmg: i64, consq: QuestConsequences, pl_dmg_dealt: i64 },
+    Defeat { pl_dmg_dealt: i64, monst_pow_used: i64, monst_dmg: i64, consq: QuestConsequences },
     ///
     /// Signals that the round did not complete the battle,
     /// providing all relevant info for the end of round, and next round
     /// 
     #[serde(rename="next")]
-    Next { pl_stats: Stats, monst_stats: Stats, next_action: NextAction, pl_dmg_dealt: i64 }
+    Next { pl_dmg_dealt: i64, monst_dmg_dealt: i64, monst_pow_used: i64, pl_stats: Stats, monst_stats: Stats, next_action: NextAction }
 }
 
 impl RoundResult {
@@ -66,8 +66,8 @@ impl RoundResult {
     pub fn battle_completed(&self) -> bool {
         match self {
             RoundResult::Victory { reward: _, pl_dmg_dealt: _ } => true,
-            RoundResult::Defeat { monst_dmg: _, consq: _, pl_dmg_dealt: _ } => true,
-            RoundResult::Next { pl_stats: _, monst_stats: _, next_action: _, pl_dmg_dealt: _ } => false
+            RoundResult::Defeat { monst_dmg: _, consq: _, pl_dmg_dealt: _, monst_pow_used: _ } => true,
+            RoundResult::Next { pl_stats: _, monst_stats: _, next_action: _, pl_dmg_dealt: _, monst_dmg_dealt: _, monst_pow_used: _ } => false
         }
     }
 }
