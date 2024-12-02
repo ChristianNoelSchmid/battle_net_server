@@ -12,6 +12,7 @@ use super::entities::{QuestMonsterEntity, QuestStateEntity};
 
 #[async_trait]
 pub trait QuestDataLayer : Send + Sync {
+    async fn pl_has_won_game(&self, user_id: i64) -> Result<bool>;
     ///
     /// Retrieves the current-day quest (if one exists) of the user specified by `user_id`
     /// Quests are active if they are both not marked as `completed`, and are from the current day.
@@ -78,6 +79,12 @@ pub struct DbQuestDataLayer {
 
 #[async_trait]
 impl QuestDataLayer for DbQuestDataLayer {
+    async fn pl_has_won_game(&self, user_id: i64) -> Result<bool> {
+        Ok(
+            sqlx::query!("SELECT * FROM game_winners WHERE user_id = ?", user_id)
+                .fetch_optional(&self.db).await?.is_some()
+        )
+    }
     async fn get_active_user_quest(&self, user_id: i64) -> Result<Option<QuestStateEntity>> {
         // Get the most recent, incomplete quest for the user (if one exists)
         let quest = sqlx::query!("
@@ -169,23 +176,13 @@ impl QuestDataLayer for DbQuestDataLayer {
 
     async fn get_user_answered_riddle(&self, user_id: i64) -> Result<Vec<i64>> {
         // Get all user completed quests that are riddle quests
-        let quest_ids: Vec<i64> = sqlx::query!(
-            "SELECT id FROM quests WHERE user_id = ? AND quest_type = 1 AND completed = TRUE", 
-            user_id
+        let riddle_idxs: Vec<i64> = sqlx::query!("
+            SELECT qr.riddle_idx FROM quests q JOIN quest_riddles qr ON q.id = qr.quest_id 
+            WHERE q.user_id = ? AND q.quest_type = 1 AND q.completed = TRUE
+            ", user_id
         )
             .fetch_all(&self.db).await?
-            .iter().map(|q| q.id).collect();
-
-        // Format the quest ids for the query
-        let quest_ids_fmt = quest_ids.iter().map(|id| format!("{}", id)).collect::<Vec<String>>().join(",");
-
-        // Get all riddle idxs using the riddle quest ids
-        let riddle_idxs: Vec<i64> = sqlx::query!(
-            "SELECT riddle_idx FROM quest_riddles WHERE quest_id IN (?)", 
-            quest_ids_fmt
-        )
-            .fetch_all(&self.db).await?
-            .iter().map(|r| r.riddle_idx).collect();
+            .iter().map(|q| q.riddle_idx).collect();
 
         Ok(riddle_idxs)
     }

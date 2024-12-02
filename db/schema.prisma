@@ -9,13 +9,15 @@ datasource db {
 //}
 
 model User {
-  id                     Int     @default(autoincrement())
-  email                  String  @unique
+  id                     Int       @default(autoincrement())
+  email                  String    @unique
   pwd_hash               String
   card_idx               Int
-  lvl                    Int     @default(1)
-  riddle_quest_completed Boolean @default(false)
-  exhausted              Boolean @default(false)
+  lvl                    Int       @default(1)
+  riddle_quest_completed Boolean   @default(false)
+  exhausted              Boolean   @default(false)
+  guessed_today          Boolean   @default(false)
+  last_login             DateTime?
 
   murdered_game_states GameState[]
   refresh_tokens       RefreshToken[]

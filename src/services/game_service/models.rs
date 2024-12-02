@@ -34,7 +34,9 @@ pub struct GameStateModel {
     pub winner_idxs: Option<Vec<i64>>,
     pub pl_exhausted: bool,
     pub pl_completed_daily_riddle: bool,
-    pub pl_completed_all_riddles: bool
+    pub pl_completed_all_riddles: bool,
+    pub pl_guessed_today: bool,
+    pub first_login: bool,
 }
 
 #[derive(Serialize, Clone, Constructor, Copy)]
@@ -47,6 +49,18 @@ pub struct Stats {
 
 pub struct MurderedUserModel {
     pub card_idx: i64
+}
+
+#[derive(Debug, Serialize)]
+pub enum GuessResult {
+    #[serde(rename="correct")]
+    Correct([i64;3]),
+    #[serde(rename="incorrect")]
+    Incorrect,
+    #[serde(rename="already-won")]
+    AlreadyWon,
+    #[serde(rename="already-guessed-today")]
+    AlreadyGuessedToday,
 }
 
 impl Stats {

@@ -3,8 +3,7 @@ use std::sync::Arc;
 use axum::{Router, routing::{post, get}, extract::{State, FromRef}, Json, middleware};
 
 use crate::{
-    services::{game_service::{GameService, error::Result, models::{GameInitialStateModel, GameStateModel, UserCardModel}}, token_service::TokenService},
-    middleware::auth_middleware::{AuthContext, auth_middleware, AdminContext},
+    middleware::auth_middleware::{auth_middleware, AdminContext, AuthContext}, services::{game_service::{error::Result, models::{GameInitialStateModel, GameStateModel, GuessResult, UserCardModel}, GameService}, token_service::TokenService}
 };
 
 #[derive(Clone, FromRef)]
@@ -35,7 +34,7 @@ async fn game_state(State(game_service): State<Arc<dyn GameService>>, ctx: AuthC
     Ok(Json(game_service.game_state(ctx.user_id).await?))
 }
 
-async fn guess_target_cards(State(game_service): State<Arc<dyn GameService>>, ctx: AuthContext, guess: Json<Vec<i64>>) -> Result<Json<bool>> {
+async fn guess_target_cards(State(game_service): State<Arc<dyn GameService>>, ctx: AuthContext, guess: Json<Vec<i64>>) -> Result<Json<GuessResult>> {
     Ok(Json(game_service.guess_target_cards(ctx.user_id, &guess).await?))
 }
 

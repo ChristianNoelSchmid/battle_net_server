@@ -1,9 +1,10 @@
 use axum::async_trait;
+use chrono::Utc;
 use derive_more::Constructor;
 use rand::{seq::SliceRandom, thread_rng};
 use sqlx::SqlitePool;
 
-use crate::{data_layer_error::Result, resources::game_resources::BaseStats, services::quest_service};
+use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
 
 use super::models::{CardModel, GameStateModel, MurderedUserModel, Stats, UserCardModel};
 
@@ -15,6 +16,8 @@ pub trait GameDataLayer : Send + Sync {
     /// Checks if there is a game currently running
     /// 
     async fn is_game_active(&self) -> Result<bool>;
+    async fn pl_guessed_today(&self, user_id: i64) -> Result<bool>;
+    async fn update_guessed_today(&self, user_id: i64) -> Result<()>;
     ///
     /// Sets up the game with the given target cards (excluding the murdered user card,
     /// as that is generated in this process), and base user stats. 
@@ -65,6 +68,19 @@ impl GameDataLayer for DbGameDataLayer {
             sqlx::query!("SELECT * FROM game_states")
             .fetch_optional(&self.db).await?.is_some()
         )
+    }
+
+    async fn pl_guessed_today(&self, user_id: i64) -> Result<bool> {
+        Ok(
+            sqlx::query!("SELECT guessed_today FROM users WHERE id = ?", user_id)
+                .fetch_one(&self.db).await?.guessed_today
+        )
+    }
+
+    async fn update_guessed_today(&self, user_id: i64) -> Result<()> {
+        sqlx::query!("UPDATE users SET guessed_today = TRUE WHERE id = ?", user_id)
+            .execute(&self.db).await?;
+        Ok(())
     }
 
     async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<Option<MurderedUserModel>> {
@@ -135,7 +151,7 @@ impl GameDataLayer for DbGameDataLayer {
 
         // Get the user's info
         let user = sqlx::query!("
-            SELECT exhausted, riddle_quest_completed FROM users WHERE id = ?
+            SELECT exhausted, riddle_quest_completed, guessed_today, last_login FROM users WHERE id = ?
             ", user_id
         ).fetch_one(&self.db).await?;
         
@@ -176,6 +192,11 @@ impl GameDataLayer for DbGameDataLayer {
         )
             .fetch_one(&self.db).await?;
 
+        // Update user to set last login to now
+        let now = Utc::now();
+        sqlx::query!("UPDATE users SET last_login = ? WHERE id = ?", now, user_id)
+            .execute(&self.db).await?;
+
         Ok(Some(GameStateModel {
             user_id,
             target_cards, 
@@ -185,7 +206,9 @@ impl GameDataLayer for DbGameDataLayer {
             murdered_user_id: murdered_user_id.unwrap(),
             pl_exhausted: user.exhausted,
             pl_completed_daily_riddle: user.riddle_quest_completed,
-            pl_completed_all_riddles: false
+            pl_completed_all_riddles: false,
+            pl_guessed_today: user.guessed_today,
+            first_login: user.last_login.is_none() 
         }))
     }
 

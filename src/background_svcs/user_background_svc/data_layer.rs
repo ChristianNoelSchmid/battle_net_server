@@ -48,7 +48,7 @@ impl DataLayer for DbDataLayer {
             .execute(&self.db).await?;
 
         // Set all player levels to 1
-        sqlx::query!("UPDATE users SET lvl = 1, exhausted = FALSE, riddle_quest_completed = FALSE")
+        sqlx::query!("UPDATE users SET lvl = 1, exhausted = FALSE, riddle_quest_completed = FALSE, guessed_today = FALSE")
             .execute(&self.db).await?;
 
         // Update the game_state's last refresh time to now

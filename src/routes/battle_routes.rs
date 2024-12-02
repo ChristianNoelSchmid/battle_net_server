@@ -1,9 +1,9 @@
 use std::{sync::Arc, ops::ControlFlow};
 
-use axum::{Router, routing::get, middleware, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, FromRef, State}, response::IntoResponse, http::StatusCode};
+use axum::{Router, routing::get, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, FromRef, State}, response::IntoResponse};
 use log::error;
 
-use crate::{middleware::auth_middleware::{auth_middleware, AuthContext}, services::{auth_service::{self, AuthService}, battle_service::BattleService, quest_service::{error::QuestServiceError, QuestService}, token_service::TokenService}};
+use crate::services::{battle_service::BattleService, quest_service::{error::QuestServiceError, QuestService}, token_service::TokenService};
 
 #[derive(Clone, FromRef)]
 pub struct BattleRoutesState {

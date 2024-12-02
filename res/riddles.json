@@ -85,7 +85,7 @@
   },
   {
     "text": "What has an eye but can’t see?",
-    "answers": ["needle", "hurricane", "storm"]
+    "answers": ["needle", "hurricane", "storm", "tsunami"]
   },
   {
     "text": "What has hands but can’t clap?",
@@ -97,7 +97,7 @@
   },
   {
     "text": "What is full of holes but still holds water?",
-    "answers": ["sponge", "net", "filter"]
+    "answers": ["sponge"]
   },
   {
     "text": "I’m not alive, but I can grow. I don’t have lungs, but I need air. I don’t have a mouth, but water kills me. What am I?",
@@ -109,7 +109,7 @@
   },
   {
     "text": "What is so fragile that saying its name breaks it?",
-    "answers": ["silence", "quiet", "hush"]
+    "answers": ["silence"]
   },
   {
     "text": "The more you share me, the less you have. What am I?",

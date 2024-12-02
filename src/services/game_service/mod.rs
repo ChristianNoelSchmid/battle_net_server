@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use derive_more::Constructor;
+use models::GuessResult;
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
 
 use crate::resources::game_resources::Resources;
@@ -39,7 +40,7 @@ pub trait GameService : Send + Sync {
     /// Guesses are in order of category ID (ie. the first index must be for the 
     /// first category, etc.)
     /// 
-    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<bool>;
+    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<GuessResult>;
     ///
     /// Updates a user's card state with the particular guess-decision of the card specified.
     /// 
@@ -104,30 +105,41 @@ impl GameService for DbGameService {
         }).ok_or(GameServiceError::GameNotRunning)
     }
 
-    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<bool> {
+    async fn guess_target_cards<'a>(&self, user_id: i64, guess: &'a [i64]) -> Result<GuessResult> {
+        let winners = self.game_state(user_id).await?.winner_idxs;
+        if winners.is_some() {
+            return Ok(GuessResult::AlreadyWon);
+        }
+        let guessed_today = self.data_layer.pl_guessed_today(user_id).await.map_err(|e| e.into())?;
+        if guessed_today {
+            return Ok(GuessResult::AlreadyGuessedToday);
+        }
+
         let mut target_cards = self.data_layer.get_target_cards().await.map_err(|e| e.into())?;
 
         if target_cards.is_empty() {
             return Err(GameServiceError::GameNotRunning)
         }
 
+        self.data_layer.update_guessed_today(user_id).await.map_err(|e| e.into())?;
+
         // Sort the target cards by category index (expected order of request guess)
         target_cards.sort_by(|a, b| a.cat_idx.partial_cmp(&b.cat_idx).unwrap());
         // If the lengths do not match, the guess is incorrect
         if guess.len() != target_cards.len() {
-            return Ok(false);
+            return Ok(GuessResult::Incorrect);
         }
         // If any target card index does not match the guess card index, 
         // the guess is incorrect
-        for pair in target_cards.iter().zip(guess) {
-            if &pair.0.card_idx != pair.1 {
-                return Ok(false);
-            }
+        if target_cards.iter().zip(guess).any(|(f, s)| f.card_idx != *s) {
+            return Ok(GuessResult::Incorrect);
         }
 
         // Otherwise, guess is correct - insert user as new winner 
         self.data_layer.add_new_winner(user_id).await.map_err(|e| e.into())?;
-        Ok(true)
+
+        let ans = <[i64;3]>::try_from(guess);
+        Ok(GuessResult::Correct(ans.unwrap()))
     }
 
     async fn update_user_card(&self, user_id: i64, cat_idx: i64, card_idx: i64, guessed: bool) -> Result<()> {

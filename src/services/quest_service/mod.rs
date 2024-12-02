@@ -153,6 +153,16 @@ impl QuestService for CoreQuestService {
     async fn complete_quest(&self, user_id: i64) -> Result<QuestReward> {
         // Complete the quest
         self.data_layer.complete_quest(user_id).await.map_err(|e| e.into())?;
+
+        if self.data_layer.pl_has_won_game(user_id).await.map_err(|e| e.into())? {
+            return Ok(
+                QuestReward {
+                    item_idxs: vec![],
+                    card: None
+                },
+            );
+        }
+
         // Get a new confirmed card
         let new_card = self.data_layer.get_rand_unconfirmed_card(user_id, &self.res.evd_cats_and_cards).await.map_err(|e| e.into())?;
 
