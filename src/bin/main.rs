@@ -20,7 +20,7 @@ use tracing::Level;
 
 lazy_static! {
     static ref DATABASE_URL: &'static str = {
-        dotenv().unwrap();
+        dotenv().ok();
         dotenv!("DATABASE_URL")
     };
 }

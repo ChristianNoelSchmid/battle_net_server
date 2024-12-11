@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use derive_more::Constructor;
-use rand::{seq::IteratorRandom, thread_rng};
+use rand::{seq::{IteratorRandom, SliceRandom}, thread_rng};
 
 use self::models::{
     QuestReward, RiddleStatus, QuestStateModel, QuestRiddleModel, QuestMonsterModel, QuestConsequences,
@@ -111,9 +111,19 @@ impl QuestService for CoreQuestService {
                     |ms| Some(QuestMonsterModel { stats: ms.stats, res_idx: ms.monster_idx })
                 );
                 let riddle_state = quest.riddle_idx.and_then(
-                    |idx| Some(QuestRiddleModel { 
-                        text: self.res.riddles[idx as usize].text.clone(), 
-                    })
+                    |idx| {
+                        let mut rng = thread_rng();
+                        let ans_scramb = self.res.riddles[idx as usize].answer.clone();
+                        let mut ans_scramb = ans_scramb.chars().collect::<Vec<char>>();
+                        ans_scramb.shuffle(&mut rng);
+                        let ans_scramb = ans_scramb.into_iter().collect();
+                        println!("{ans_scramb}");
+
+                        Some(QuestRiddleModel { 
+                            text: self.res.riddles[idx as usize].text.clone(), 
+                            ans_scramb
+                        })
+                    }
                 );
 
                 return Ok(QuestStateModel { quest_type: quest.quest_type, monster_state, riddle_state });
@@ -124,12 +134,6 @@ impl QuestService for CoreQuestService {
     async fn guess_riddle(&self, user_id: i64, answer: String) -> Result<RiddleStatus> {
         // Lowercase answer for string-matching
         let answer = answer.to_lowercase();
-        let answer = answer
-            .trim_start()
-            .trim_start_matches("the")
-            .trim_start_matches("a")
-            .trim_start_matches("an")
-            .trim_start();
 
         // Get the user's riddle quest index. Throw error if one isn't found
         // (ie. the user is not on a riddle quest)
@@ -140,7 +144,7 @@ impl QuestService for CoreQuestService {
 
         // If the user provides any answer in the collection of answers for the riddle,
         // quest is successfully completed
-        if riddle.answers.iter().any(|ans| ans.to_lowercase() == answer) {
+        if riddle.answer.to_lowercase() == answer {
             return Ok(RiddleStatus::Correct(self.complete_quest(user_id).await.map_err(|e| e.into())?));
         }
         return Ok(RiddleStatus::Incorrect);
@@ -224,8 +228,16 @@ impl CoreQuestService {
         return if let Some((idx, riddle)) = idx_and_riddle {
             self.data_layer.create_quest_riddle(quest_id, idx as i64).await.map_err(|e| e.into())?;
 
-            Ok(QuestRiddleModel {
-                text: riddle.text.clone(),
+            Ok({
+                let mut rng = thread_rng();
+                let ans_scramb = riddle.answer.clone();
+                let mut ans_scramb = ans_scramb.chars().collect::<Vec<char>>();
+                ans_scramb.shuffle(&mut rng);
+
+                QuestRiddleModel { 
+                    text: riddle.text.clone(), 
+                    ans_scramb: ans_scramb.into_iter().collect()
+                }
             })
         } else {
             Err(QuestServiceError::AllRiddlesCompleted)

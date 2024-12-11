@@ -1,122 +1,114 @@
 [
   {
     "text": "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
-    "answers": ["echo", "reverberation", "sound"]
+    "answer": "an echo"
   },
   {
     "text": "The more of me you take, the more you leave behind. What am I?",
-    "answers": ["footsteps", "tracks", "impressions"]
+    "answer": "footsteps"
   },
   {
     "text": "What has to be broken before you can use it?",
-    "answers": ["egg", "glow stick", "nut"]
+    "answer": "a glow stick"
   },
   {
     "text": "I’m light as a feather, yet the strongest person can’t hold me for very long. What am I?",
-    "answers": ["breath", "air"]
+    "answer": "a breath"
   },
   {
     "text": "I’m always in front of you but can’t be seen. What am I?",
-    "answers": ["future", "time", "destiny"]
+    "answer": "the future"
   },
   {
     "text": "I’m tall when I’m young, and I’m short when I’m old. What am I?",
-    "answers": ["candle", "pencil"]
-  },
-  {
-    "text": "What has one head, one foot, and four legs?",
-    "answers": ["bed", "cot", "bunk"]
+    "answer": "a candle"
   },
   {
     "text": "What comes at night without being called, and is lost in the day without being stolen?",
-    "answers": ["stars", "darkness", "dreams"]
+    "answer": "stars"
   },
   {
     "text": "I fly without wings, I cry without eyes. Whenever I go, darkness flies. What am I?",
-    "answers": ["cloud", "wind", "storm"]
+    "answer": "a cloud"
   },
   {
     "text": "What can you keep after giving it to someone?",
-    "answers": ["word", "promise", "secret"]
+    "answer": "a promise"
   },
   {
     "text": "I can fill a room, but I take up no space. What am I?",
-    "answers": ["light", "air", "sound"]
-  },
-  {
-    "text": "The more you take away from me, the bigger I get. What am I?",
-    "answers": ["hole", "pit", "gap"]
+    "answer": "light"
   },
   {
     "text": "What has keys but can’t open locks?",
-    "answers": ["piano", "keyboard", "typewriter"]
+    "answer": "a piano"
   },
   {
     "text": "What can travel around the world while staying in the same spot?",
-    "answers": ["stamp", "postage", "mail"]
+    "answer": "postage"
   },
   {
     "text": "What has a neck but no head?",
-    "answers": ["bottle", "jar", "vase"]
+    "answer": "a bottle"
   },
   {
     "text": "What can run but never walks, has a bed but never sleeps, and has a mouth but never talks?",
-    "answers": ["river", "stream", "brook"]
+    "answer": "a river"
   },
   {
     "text": "What begins with T, ends with T, and has T in it?",
-    "answers": ["teapot", "teabag", "tea"]
+    "answer": "a teapot"
   },
   {
     "text": "The more you have of me, the less you see. What am I?",
-    "answers": ["darkness", "fog", "shadow"]
+    "answer": "darkness"
   },
   {
     "text": "What has many needles but doesn’t sew?",
-    "answers": ["pine tree", "cactus", "spruce"]
+    "answer": "a pine tree"
   },
   {
     "text": "What comes once in a minute, twice in a moment, but never in a thousand years?",
-    "answers": ["letter M", "M", "symbol M"]
+    "answer": "the letter m"
   },
   {
     "text": "What gets wetter the more it dries?",
-    "answers": ["towel", "rag", "cloth"]
+    "answer": "a towel"
   },
   {
     "text": "What has an eye but can’t see?",
-    "answers": ["needle", "hurricane", "storm", "tsunami"]
+    "answer": "a hurricane"
   },
   {
     "text": "What has hands but can’t clap?",
-    "answers": ["clock", "watch", "timepiece"]
+    "answer": "a clock"
   },
   {
     "text": "What can be caught but never thrown?",
-    "answers": ["cold", "illness", "virus"]
+    "answer": "illness"
   },
   {
     "text": "What is full of holes but still holds water?",
-    "answers": ["sponge"]
+    "answer": "a sponge"
   },
   {
     "text": "I’m not alive, but I can grow. I don’t have lungs, but I need air. I don’t have a mouth, but water kills me. What am I?",
-    "answers": ["fire", "flame", "ember"]
+    "answer": "fire"
   },
   {
     "text": "What has no beginning, end, or middle?",
-    "answers": ["circle", "ring", "loop"]
+    "answer": "a circle"
   },
   {
     "text": "What is so fragile that saying its name breaks it?",
-    "answers": ["silence"]
+    "answer": "silence"
   },
   {
     "text": "The more you share me, the less you have. What am I?",
-    "answers": ["secret", "intimacy", "confidence"]
+    "answer": "a secret"
   },
   {
     "text": "What has legs but doesn’t walk?",
-    "answers": ["table", "chair", "stool"]
+    "answer": "a table"
   }
 ]
