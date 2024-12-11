@@ -50,10 +50,10 @@ async fn main() {
 
     let app = Router::new()
         // Routes
-        .nest("/auth", auth_routes::routes(auth_service))
-        .nest("/game", game_routes::routes(game_service, token_service.clone()))
-        .nest("/quest", quest_routes::routes(quest_service.clone(), token_service.clone()))
-        .nest("/battle", battle_routes::routes(token_service, quest_service, battle_service))
+        .nest("/api/v1/auth", auth_routes::routes(auth_service))
+        .nest("/api/v1/game", game_routes::routes(game_service, token_service.clone()))
+        .nest("/api/v1/quest", quest_routes::routes(quest_service.clone(), token_service.clone()))
+        .nest("/api/v1/battle", battle_routes::routes(token_service, quest_service, battle_service))
         // Logging
         .layer(
             TraceLayer::new_for_http()
@@ -63,7 +63,7 @@ async fn main() {
         // Cookies
         .layer(CookieManagerLayer::new());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3005));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3005));
 
     // User background refresh stats service
     let move_res = res.clone(); 
