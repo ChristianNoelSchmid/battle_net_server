@@ -38,7 +38,7 @@ pub trait TokenService: Send + Sync {
     /// Verifies a JWT `token`, and returns the corresponding user ID from the its content section with successful verification.
     /// Returns the associated user ID, or `Error` in the event of unsuccessful verification
     ///
-    fn verify_access_token(&self, access_token: String) -> Result<i64>;
+    fn verify_access_token(&self, access_token: &str) -> Result<i64>;
 }
 
 #[derive(Clone, Constructor)]
@@ -66,7 +66,7 @@ impl TokenService for CoreTokenService {
         }
     }
 
-    fn verify_access_token(&self, token: String) -> Result<i64> {
+    fn verify_access_token(&self, token: &str) -> Result<i64> {
         // Convert the JWT_SECRET env variable into a Hmac hasher
         let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
             .expect("error converting SECRET into Hmac<Sha256>");
@@ -122,7 +122,7 @@ mod tests {
 
         let tokens = svc.generate_auth_tokens(user_id);
 
-        let token_user_id = svc.verify_access_token(tokens.access_token);
+        let token_user_id = svc.verify_access_token(&tokens.access_token);
         assert!(token_user_id.is_ok());
 
         let token_user_id = token_user_id.unwrap();
@@ -155,7 +155,7 @@ mod tests {
 
         // Assert that an error is thrown when the token is attempted to
         // be verified
-        let verified_info = svc.verify_access_token(new_token);
+        let verified_info = svc.verify_access_token(&new_token);
         assert!(verified_info.is_err());
     }
 }

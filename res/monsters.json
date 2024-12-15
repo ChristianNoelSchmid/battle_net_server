@@ -17,8 +17,8 @@
     "attack_flv_texts": [
         "Wilfred dives his hand into his robe, preparing to fling powder at you.",
         "Wilfred begins to chant a spell. He's about to attack.",
-        "Wilfred waves his hands sporadically. He's casting a terrible rune.",
-        "Wilfred reveals a dark orb with a grin. He looks menacing."
+        "Wilfred waves his hands sporadically. He's casting a rune.",
+        "Wilfred reveals a dark orb, his face terrible to behold."
     ],
     "defend_flv_texts": [
         "Wilfred summons a shield. He hides behind it."
@@ -49,9 +49,9 @@
         "Possesed Nutcraker is ready to flurry! You see a glint in it's cold eyes."
     ],
     "defend_flv_texts": [
-        "{name} steps back and raises its sword in a defensive posture."
+        "Possessed Nutcracker steps back and raises its sword in a defensive posture."
     ],
     "idle_flv_texts": [
-        "{name} cocks it's head quizzically - it seems confused."
+        "Possessed Nutcracker cocks it's head quizzically - it seems confused."
     ]
 }]

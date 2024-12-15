@@ -28,8 +28,9 @@ pub struct CreateUserPayload {
 ///
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginPayload {
-    pub email: String,
-    pub pwd: String,
+    pub email: Option<String>,
+    pub pwd: Option<String>,
+    pub access_token: Option<String>,
 }
 
 #[derive(Clone, FromRef)]
@@ -63,13 +64,17 @@ async fn login(
     cookies: Cookies,
     Json(model): Json<LoginPayload>,
 ) -> impl IntoResponse {
-    auth_service
-        .try_accept_creds(model.email, model.pwd)
-        .await
-        .and_then(|tokens| {
-            cookies.add(create_cookie(tokens.refresh_token));
-            Ok(Json(tokens.access_token))
-        })
+    let res = if let Some(email) = model.email {
+        auth_service.try_accept_creds(email, model.pwd.unwrap()).await
+    } else {
+        let access_token = model.access_token.unwrap();
+        auth_service.try_accept_access_token(&access_token).await
+    };
+    
+    res.and_then(|tokens| {
+        cookies.add(create_cookie(tokens.refresh_token));
+        Ok(Json(tokens.access_token))
+    })
 }
 
 ///

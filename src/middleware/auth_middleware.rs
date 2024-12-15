@@ -84,7 +84,7 @@ pub async fn auth_middleware<B : Send> (
         if access_token == ADMIN_SECRET.to_string() {
             request.extensions_mut().insert(AdminContext);
         } else {
-            let result = token_service.verify_access_token(access_token);
+            let result = token_service.verify_access_token(&access_token);
 
             if let Ok(user_id) = result {
                 request.extensions_mut().insert(AuthContext { user_id });

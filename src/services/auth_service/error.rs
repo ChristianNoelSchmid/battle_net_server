@@ -2,7 +2,7 @@ use axum::{response::{IntoResponse, Response}, http::StatusCode};
 use log::error;
 use thiserror::Error;
 
-use crate::data_layer_error::DataLayerError;
+use crate::{data_layer_error::DataLayerError, services::token_service::{self, error::TokenError}};
 
 pub type Result<T> = std::result::Result<T, AuthServiceError>;
 
@@ -21,12 +21,20 @@ pub enum AuthServiceError {
     #[error("The token provided doesn't exist")]
     TokenDoesNotExist,
     #[error("The given user cannot be found")]
-    UserNotFound(i64, i64)
+    UserNotFound(i64, i64),
+    #[error("An error has occured")]
+    TokenServiceError(token_service::error::TokenError),
 }
 
-impl Into<AuthServiceError> for DataLayerError {
-    fn into(self) -> AuthServiceError {
-        AuthServiceError::DataLayerError(self)
+impl From<DataLayerError> for AuthServiceError {
+    fn from(value: DataLayerError) -> Self {
+        AuthServiceError::DataLayerError(value)
+    }
+}
+
+impl From<TokenError> for AuthServiceError {
+    fn from(value: TokenError) -> Self {
+        AuthServiceError::TokenServiceError(value)
     }
 }
 

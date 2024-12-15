@@ -53,7 +53,7 @@ async fn handle_socket(
     }
 
     let user_id = match socket.recv().await {
-        Some(Ok(msg)) => Some(token_service.verify_access_token(msg.into_text().unwrap().to_string()).unwrap()),
+        Some(Ok(msg)) => Some(token_service.verify_access_token(&msg.into_text().unwrap()).unwrap()),
         _ => None
     };
     if user_id.is_none() {
