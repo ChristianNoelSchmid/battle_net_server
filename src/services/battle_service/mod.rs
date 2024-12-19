@@ -69,7 +69,6 @@ impl BattleService for CoreBattleService {
     }
 
     async fn attack(&self, user_id: i64, power: i64) -> Result<RoundResult> { 
-        sleep(Duration::from_millis(1500)).await;
         let pl_power = self.data_layer.get_pl_power(user_id).await.map_err(|e| e.into())?;
         // Check that the player has enough power
         if pl_power < power {
@@ -96,7 +95,6 @@ impl BattleService for CoreBattleService {
         }
     }
     async fn defend(&self, user_id: i64) -> Result<RoundResult> {
-        sleep(Duration::from_millis(1500)).await;
         self.perform_monster_action(user_id, true, 0).await.map_err(|e| e.into())
     }
     async fn use_item(&self, _user_id: i64, _item_idx: i64) -> Result<RoundResult> { 

@@ -1,12 +1,11 @@
 use axum::async_trait;
 use chrono::Utc;
 use derive_more::Constructor;
-use rand::{seq::SliceRandom, thread_rng};
 use sqlx::SqlitePool;
 
 use crate::{data_layer_error::Result, resources::game_resources::BaseStats};
 
-use super::models::{CardModel, GameStateModel, MurderedUserModel, Stats, UserCardModel};
+use super::models::{CardModel, GameStateModel, Stats, UserCardModel};
 
 const PERSON_CAT_IDX: i32 = 0;
 
@@ -23,7 +22,7 @@ pub trait GameDataLayer : Send + Sync {
     /// as that is generated in this process), and base user stats. 
     /// Returns the randomly chosen murdered user.
     ///
-    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<Option<MurderedUserModel>>;
+    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<()>;
     /// 
     /// Returns all current game state data, as it pertains to the particular user
     /// (ie. if the user has won, their collection of evidence cards, etc.)
@@ -83,30 +82,13 @@ impl GameDataLayer for DbGameDataLayer {
         Ok(())
     }
 
-    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<Option<MurderedUserModel>> {
+    async fn setup_game<'a>(&self, target_cards: &'a [CardModel], base_stats: &'a BaseStats) -> Result<()> {
         // Get all user ids and card_idxs
         let users = sqlx::query!("SELECT id, card_idx FROM users")
             .fetch_all(&self.db).await?;
 
-        // Choose a random user from the list
-        let murdered_user = users.choose(&mut thread_rng());
-
-        // Return None if there is no user to murder. There must be users present to initialize game
-        if let None = murdered_user {
-            return Ok(None);
-        }
-        let murdered_user = murdered_user.unwrap();
-
         // Get all other user ids
         let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
-
-        // Add the murdered user to all users evidence cards (that user is not a target card)
-        for id in &user_ids {
-            sqlx::query!("
-                INSERT INTO user_cards (user_id, cat_idx, card_idx, confirmed) VALUES (?, ?, ?, TRUE)
-                ", id, PERSON_CAT_IDX, murdered_user.card_idx
-            ).execute(&self.db).await?;
-        }
 
         // Insert base player stats for each user
         for id in user_ids {
@@ -132,10 +114,10 @@ impl GameDataLayer for DbGameDataLayer {
         }
 
         // Add the initialized game state
-        sqlx::query!("INSERT INTO game_states (murdered_user_id) VALUES (?)", murdered_user.id)
+        sqlx::query!("INSERT INTO game_states (murdered_user_id) VALUES (?)", 4)
             .execute(&self.db).await?;
 
-        Ok(Some(MurderedUserModel { card_idx: murdered_user.card_idx }))
+        Ok(())
     }
 
     async fn game_state(&self, user_id: i64) -> Result<Option<GameStateModel>> {

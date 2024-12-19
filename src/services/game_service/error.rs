@@ -36,9 +36,9 @@ impl Into<GameServiceError> for AuthServiceError {
 
 impl IntoResponse for GameServiceError {
     fn into_response(self) -> Response {
+        println!("{:?}", self);
         match self {
             GameServiceError::DataLayerError(e) => {
-                error!("{:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "An internal server error occured").into_response()
             },
             _ => (StatusCode::BAD_REQUEST, self.to_string()).into_response()

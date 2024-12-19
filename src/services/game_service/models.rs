@@ -21,7 +21,6 @@ pub struct UserCardModel {
 #[derive(Serialize)]
 pub struct GameInitialStateModel {
     pub target_cards: Vec<CardModel>,
-    pub murdered_user_card_idx: i64,
 }
 
 #[derive(Serialize)]
@@ -45,10 +44,6 @@ pub struct Stats {
     pub power: i64,
     pub armor: i64,
     pub miss_turn: bool,
-}
-
-pub struct MurderedUserModel {
-    pub card_idx: i64
 }
 
 #[derive(Debug, Serialize)]

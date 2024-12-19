@@ -67,9 +67,6 @@ impl GameService for DbGameService {
     async fn setup_game(&self) -> Result<GameInitialStateModel> {
         let mut rng = StdRng::from_entropy();
 
-        // Get the base user stats
-        let ubs = self.res.user_base_stats;
-
         // Ensure there is no game actively running
         if self.data_layer.is_game_active().await.map_err(|e| e.into())? {
             return Err(GameServiceError::GameAlreadyRunning);
@@ -84,14 +81,9 @@ impl GameService for DbGameService {
             target_cards.push(CardModel { cat_idx: cat_idx as i64, card_idx: card_idx as i64 });
         }
 
-        let murdered_user = self.data_layer.setup_game(&target_cards, &ubs)
-            .await.map_err(|e| e.into())?
-            .ok_or(GameServiceError::UsersNotFound)?;
+        self.data_layer.setup_game(&target_cards, &self.res.user_base_stats).await.map_err(|e| e.into())?;
 
-        Ok(GameInitialStateModel {
-            target_cards,
-            murdered_user_card_idx: murdered_user.card_idx,
-        })
+        Ok(GameInitialStateModel { target_cards, })
     }
 
     async fn game_state<'a>(&self, user_id: i64) -> Result<GameStateModel> {
@@ -162,17 +154,19 @@ impl DbGameService {
     /// 
     async fn insert_test_data(&self) -> Result<()> {
         let users = [
-            (0, "chris@mail.com",  "ChrisSchmid"),
-            (1, "alyssaq@mail.com", "AlyssaSchmid"),
-            (2, "andrea@mail.com", "AndreaBuckalew"),
-            (3, "zach@mail.com", "Zach Buckalew"),
-            (4, "alyssac@mail.com", "AlyssaHillen"),
-            (5, "kunane@mail.com", "KunaneHillen"),
-            (6, "brian@mail.com", "BrianHall"),
-            (7, "miranda@mail.com", "MirandaHall"),
-            (8, "maria@mail.com", "MariaMcGowan"),
-            (9, "mj@mail.com", "MJSchmid"),
-            (10, "kim@mail.com", "KimSchmid")
+            (0, "AlyssaC", "AlyssaHillen"),
+            (1, "AlyssaQ", "AlyssaSchmid"),
+            (2, "Andrea", "AndreaBuckalew"),
+            (3, "Brian", "BrianHall"),
+            (4, "Chris",  "ChrisSchmid"),
+            (5, "Coraline", "CoralineSchmid"),
+            (6, "Kim", "KimSchmid"),
+            (7, "Kunane", "KunaneHillen"),
+            (8, "Maria", "MariaMcGowan"),
+            (9, "Miranda", "MirandaHall"),
+            (10, "MJ", "MJSchmid"),
+            (11, "Paisley", "PaisleySchmid"),
+            (12, "Zach", "ZachBuckalew"),
         ];
 
         for (card_idx, email, pwd) in users.iter() {

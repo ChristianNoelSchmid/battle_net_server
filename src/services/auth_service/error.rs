@@ -40,8 +40,8 @@ impl From<TokenError> for AuthServiceError {
 
 impl IntoResponse for AuthServiceError {
     fn into_response(self) -> Response {
+        println!("{:?}", self);
         return if let AuthServiceError::DataLayerError(e) = &self {
-            error!("{:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
         } else {
             (StatusCode::BAD_REQUEST, self.to_string()).into_response()
