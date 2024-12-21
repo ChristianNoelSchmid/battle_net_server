@@ -11,9 +11,10 @@ use christmas_2022::{
     services::{token_service::{settings::TokenSettings, CoreTokenService}, 
     auth_service::{data_layer::DbAuthDataLayer, CoreAuthService}, 
     game_service::{data_layer::DbGameDataLayer, DbGameService}, quest_service::{data_layer::DbQuestDataLayer, CoreQuestService}, battle_service::{CoreBattleService, data_layer::DataLayer}}, 
-    routes::{auth_routes, game_routes, quest_routes, battle_routes}, background_svcs::user_background_svc::{refresh_daily_async, self},
+    routes::{auth_routes, game_routes, quest_routes, battle_routes}, background_svcs::user_background_svc::{create_refresh_job, self},
 };
 use sqlx::SqlitePool;
+use tokio_cron_scheduler::JobScheduler;
 use tower_cookies::CookieManagerLayer;
 use tower_http::trace::{TraceLayer, self};
 use tracing::Level;
@@ -33,6 +34,7 @@ async fn main() {
     // Setup state
     let db = SqlitePool::connect(&DATABASE_URL).await.unwrap();
     let token_settings: TokenSettings = serde_json::from_str(&fs::read_to_string("./token_settings.json").unwrap()).unwrap();
+    let user_backround_svc_settings: user_background_svc::settings::Settings = serde_json::from_str(&fs::read_to_string("./daily_refresh.json").unwrap()).unwrap();
     let token_service = Arc::new(CoreTokenService::new(token_settings.clone()));
     let res = Arc::new(Resources::from_loader(ResourceLoader::load(String::from("./res"))));
     
@@ -66,12 +68,10 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 3005));
 
     // User background refresh stats service
-    let move_res = res.clone(); 
-    let move_db = db.clone();
-    tokio::spawn(async move {
-        let usr_svc_data_layer = Arc::new(user_background_svc::data_layer::DbDataLayer { db: move_db });
-        refresh_daily_async(usr_svc_data_layer, move_res.clone()).await.unwrap();
-    });
+    let sched = JobScheduler::new().await.unwrap();
+    let usr_svc_data_layer = Arc::new(user_background_svc::data_layer::DbDataLayer { db: db.clone() });
+    sched.add(create_refresh_job(usr_svc_data_layer, res, user_backround_svc_settings).unwrap()).await.unwrap();
+    tokio::spawn(async move { sched.start().await.unwrap() });
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service()).await.unwrap();

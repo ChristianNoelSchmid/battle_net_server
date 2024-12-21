@@ -228,7 +228,7 @@ impl QuestDataLayer for DbQuestDataLayer {
                 .fetch_one(&self.db).await?.lvl;
             if lvl == 2 {
                 self.exhaust_pl(user_id).await?;
-            }
+            } 
 
             // If it was a monster battle, set the user's lvl to 2
             sqlx::query!("UPDATE users SET lvl = 2 WHERE id = ?", user_id)

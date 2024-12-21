@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.6.18", features = ["headers", "macros", "ws"] }
 base64 = "0.21.2"
+tokio-cron-scheduler = { version = "0.13.0", features = ["signal"] }
 chrono = "0.4.24"
 derive_more = "0.99.17"
 dotenvy = "0.15"

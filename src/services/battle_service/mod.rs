@@ -20,7 +20,7 @@ pub mod data_layer;
 pub mod error;
 pub mod models;
 
-const PL_DMG: [(i64, i64);4] = [(2, 3), (4, 7), (6, 12), (8, 16)];
+const PL_DMG: [(i64, i64);4] = [(1, 2), (3, 6), (5, 10), (8, 14)];
 const MAX_POWER: i64 = 4;
 
 #[async_trait]
@@ -124,7 +124,7 @@ impl CoreBattleService {
         let rng = monst_res.pow_dmg[(monst_stats.power - 1) as usize];
         let dmg = (thread_rng().next_u32() % (rng.1 - rng.0) as u32) as i64;
 
-        return if pl_defd { rng.0 + dmg } else { ((rng.0 + dmg) as f32 / 2.0) as i64 };
+        return if !pl_defd { rng.0 + dmg } else { ((rng.0 + dmg) as f32 / 2.0) as i64 };
     }
     
     ///
