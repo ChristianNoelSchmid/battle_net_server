@@ -1,4 +1,4 @@
 {
-    "jwt_lifetime_s": 86400,
+    "jwt_lifetime_s": 5184000,
     "refr_token_lifetime_s": 2592000 
 }

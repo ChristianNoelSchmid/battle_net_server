@@ -43,7 +43,7 @@ impl BattleDataLayer for DataLayer {
 
         // Generate the NextAction from the monster state, if it's making a next action
         let next_action = monster.next_action.and_then(|act| {
-            Some(NextAction::new(act, monster.action_flv_text.unwrap()))
+            Some(NextAction::new(act, monster.power, monster.action_flv_text.unwrap()))
         });
 
         // Create the monster from the provided info

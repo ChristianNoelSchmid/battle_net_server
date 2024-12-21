@@ -32,6 +32,10 @@ pub struct NextAction {
     /// 
     pub idx: i64,
     ///
+    /// The monster's current power
+    /// 
+    pub pow: i64,
+    ///
     /// The flavor text of the action being performed
     /// 
     pub flv_text: String

@@ -222,6 +222,14 @@ impl QuestDataLayer for DbQuestDataLayer {
             .execute(&self.db).await?;
 
         if quest.quest_type == 0 {
+            // If it was a monster battle, check if the user's lvl is currently 2
+            // if so, set the player to exhausted
+            let lvl = sqlx::query!("SELECT lvl FROM users WHERE id = ?", user_id)
+                .fetch_one(&self.db).await?.lvl;
+            if lvl == 2 {
+                self.exhaust_pl(user_id).await?;
+            }
+
             // If it was a monster battle, set the user's lvl to 2
             sqlx::query!("UPDATE users SET lvl = 2 WHERE id = ?", user_id)
                 .execute(&self.db).await?;

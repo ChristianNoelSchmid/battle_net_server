@@ -165,6 +165,6 @@ impl CoreBattleService {
     fn get_monster_next_action(&self, monst_res: &Monster, pl_stats: &Stats, monst_stats: &Stats) -> NextAction {
         let next_action_idx = AI[monst_res.name.as_str()].next_act(&pl_stats, &monst_stats);
         let next_flv_text = self.get_action_flv_txt(&monst_stats, &monst_res, next_action_idx).to_string();
-        NextAction::new(next_action_idx, next_flv_text)
+        NextAction::new(next_action_idx, monst_stats.power, next_flv_text)
     }
 }

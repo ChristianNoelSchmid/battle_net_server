@@ -54,4 +54,32 @@
     "idle_flv_texts": [
         "Possessed Nutcracker cocks it's head quizzically - it seems confused."
     ]
+}, {
+    "name": "Evil Chris",
+    "level": 2,
+    "pow_dmg": [
+        [1, 3],
+        [2, 6],
+        [3, 7],
+        [4, 10]
+    ],
+    "stats": {
+        "health": 12,
+        "magicka": 0,
+        "reflex": 8,
+        "wisdom": 2,
+        "armor": 8
+    },
+    "attack_flv_texts": [
+        "Evil Chris is about to give a steely leer",
+        "Evil Chris is going to spew a series of profanities!",
+        "Possesed Nutcracker mechanically stoops for a quick jump forward.",
+        "Possesed Nutcraker is ready to flurry! You see a glint in it's cold eyes."
+    ],
+    "defend_flv_texts": [
+        "Evil Chris hides behind his enormous, if unfounded, confidence"
+    ],
+    "idle_flv_texts": [
+        "Possessed Nutcracker cocks it's head quizzically - it seems confused."
+    ]
 }]

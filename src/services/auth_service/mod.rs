@@ -26,6 +26,7 @@ lazy_static! {
 
 #[async_trait]
 pub trait AuthService: Send + Sync {
+    async fn print_all_access_tokens(&self) -> Result<()>;
     async fn try_accept_access_token(&self, access_token: &str) -> Result<AuthTokensModel>;
     async fn try_accept_creds(&self, email: String, pwd: String) -> Result<AuthTokensModel>;
     async fn try_accept_refresh(&self, refr_token: String) -> Result<AuthTokensModel>;
@@ -40,6 +41,15 @@ pub struct CoreAuthService {
 
 #[async_trait]
 impl AuthService for CoreAuthService {
+    async fn print_all_access_tokens(&self) -> Result<()> {
+        let users = self.data_layer.get_all_users().await?;
+        for (email, id) in users {
+            let access_token = self.token_service.generate_auth_tokens(id).access_token;
+            println!("User {email} ({id}): {access_token}");
+        }
+
+        Ok(())
+    }
     async fn try_accept_access_token(&self, access_token: &str) -> Result<AuthTokensModel> {
         let user_id = self.token_service.verify_access_token(access_token)?;
         let tokens = self.token_service.generate_auth_tokens(user_id);

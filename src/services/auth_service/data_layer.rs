@@ -9,6 +9,7 @@ use super::models::{UserModel, RefrTokenModel};
 
 #[async_trait]
 pub trait AuthDataLayer : Send + Sync {
+    async fn get_all_users(&self) -> Result<Vec<(String, i64)>>;
     async fn get_user_by_id(&self, user_id: i64) -> Result<Option<UserModel>>;
     async fn get_user_by_email<'a>(&self, email: &'a str) -> Result<Option<UserModel>>;
 
@@ -28,6 +29,9 @@ pub struct DbAuthDataLayer {
 
 #[async_trait]
 impl AuthDataLayer for DbAuthDataLayer {
+    async fn get_all_users(&self) -> Result<Vec<(String, i64)>> {
+        Ok(sqlx::query!("SELECT id, email FROM users").fetch_all(&self.db).await?.into_iter().map(|u| (u.email, u.id)).collect())
+    }
     async fn get_user_by_id(&self, user_id: i64) -> Result<Option<UserModel>> {
         let user = sqlx::query_as!(UserModel, 
             "SELECT id, email, pwd_hash FROM users WHERE id = ?", user_id

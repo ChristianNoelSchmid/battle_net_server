@@ -29,9 +29,17 @@ impl Ai for NutcrackerAi {
     }
 }
 
+struct EvilChrisAi;
+impl Ai for EvilChrisAi {
+    fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> i64 {
+        DEFEND_IDX
+    }
+}
+
 lazy_static! {
     pub static ref AI: HashMap<&'static str, Arc<dyn Ai>> = [
         ("Wilfred, the Esteemed Wizard", Arc::new(WilfredAi) as Arc<dyn Ai>),
-        ("Possesed Nutcracker", Arc::new(NutcrackerAi) as Arc<dyn Ai>)
+        ("Possesed Nutcracker", Arc::new(NutcrackerAi) as Arc<dyn Ai>),
+        ("Evil Chris", Arc::new(EvilChrisAi) as Arc<dyn Ai>)
     ].iter().cloned().collect();
 }

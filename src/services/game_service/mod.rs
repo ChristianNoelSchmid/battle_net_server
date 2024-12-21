@@ -82,6 +82,7 @@ impl GameService for DbGameService {
         }
 
         self.data_layer.setup_game(&target_cards, &self.res.user_base_stats).await.map_err(|e| e.into())?;
+        self.auth_service.print_all_access_tokens().await.map_err(|e| e.into())?;
 
         Ok(GameInitialStateModel { target_cards, })
     }

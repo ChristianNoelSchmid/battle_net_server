@@ -3,24 +3,26 @@
         "tag": "us",
         "name": "People",
         "cards": [
-            { "name": "Chris", "img_path": "Chris.png", "flavor_text": "Has an evil doppelganger named Evil Chris. May be seen lurking about." },
+            { "name": "Alyssa C.", "img_path":"Alyssa C.png", "flavor_text": "" },
             { "name": "Alyssa Q.", "img_path": "Alyssa Q.png", "flavor_text": "Often assumes the form of a bumble-elf - that is a half-elf, half-bumble-bee." },
             { "name": "Andrea", "img_path": "Andrea.png", "flavor_text": "Found among the trees and sprites of the forests. Loves cats." },
-            { "name": "Zach", "img_path": "Zach.png", "flavor_text": "Rewarded most manly grizzle of our time. Spends his days defeating foes with glances." },
-            { "name": "Alyssa C.", "img_path":"Alyssa C.png", "flavor_text": "" },
-            { "name": "Kunane", "img_path":"Kunane.png", "flavor_text": "" },
             { "name": "Brian", "img_path":"Brian.png" },
-            { "name": "Miranda", "img_path":"Miranda.png", "flavor_text": "Spends her days..." },
+            { "name": "Chris", "img_path": "Chris.png", "flavor_text": "Has an evil doppelganger named Evil Chris. May be seen lurking about." },
+            { "name": "Coraline", "img_path": "Coraline.png", "flavor_text": "" },
+            { "name": "Kim", "img_path": "Kim.png" },
+            { "name": "Kunane", "img_path":"Kunane.png", "flavor_text": "" },
             { "name": "Maria", "img_path":"Maria.png", "flavor_text": "Weapon of choice is throwing her dogs at foes, until they are overwhelmed by The Cute." },
+            { "name": "Miranda", "img_path":"Miranda.png", "flavor_text": "Spends her days..." },
             { "name": "MJ", "img_path":"MJ.png", "flavor_text": "Regularly confused with George Clooney, often seen making pilgrimages to spook towns." },
-            { "name": "Kim", "img_path": "Kim.png" }
+            { "name": "Paisley", "img_path":"Paisley.png", "flavor_text": "" },
+            { "name": "Zach", "img_path": "Zach.png", "flavor_text": "Rewarded most manly grizzle of our time. Spends his days defeating foes with glances." }
         ]
     }, {
         "tag": "mw",
         "name": "Murder Weapons",
         "cards": [
             { "name": "Nutcracker" },
-            { "name": "Holiday Cake", "img_path": "murder_weapon_fruit_cake.png" },
+            { "name": "Fruitcake", "img_path": "murder_weapon_fruit_cake.png" },
             { "name": "Ugly Christmas Sweater", "img_path": "murder_weapon_sweater.png" },
             { "name": "Ornament Barrage", "img_path": "murder_weapon_ornament_barrage.png" },
             { "name": "Candy Cane Shank", "img_path": "murder_weapon_candy_cane.png"}
@@ -31,7 +33,9 @@
         "cards": [
             { "name": "Elf" }, 
             { "name": "The Polar Express" }, 
-            { "name": "The Grinch" }
+            { "name": "The Grinch" },
+            { "name": "A Muppet XMas Carroll" },
+            { "name": "It's a Wonderful Life" }
         ]
     }
 ]

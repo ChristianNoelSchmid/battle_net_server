@@ -56,6 +56,8 @@ pub fn routes(auth_service: Arc<dyn AuthService>) -> Router {
         .with_state(AuthRoutesState { auth_service })
 }
 
+
+
 ///
 /// Generates new access token and refresh token, using the login information
 ///
