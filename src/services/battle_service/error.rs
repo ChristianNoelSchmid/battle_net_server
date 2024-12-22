@@ -29,9 +29,9 @@ impl Into<BattleServiceError> for DataLayerError {
 impl IntoResponse for BattleServiceError {
     fn into_response(self) -> Response {
         println!("{:?}", self);
-        return if let BattleServiceError::DataLayerError(e) = &self {
+        return if let BattleServiceError::DataLayerError(_) = &self {
             (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
-        } else if let BattleServiceError::QuestServiceError(e) = &self {
+        } else if let BattleServiceError::QuestServiceError(_) = &self {
             (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
         } else {
             (StatusCode::BAD_REQUEST, self.to_string()).into_response()

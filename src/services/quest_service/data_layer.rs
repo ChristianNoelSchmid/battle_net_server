@@ -236,11 +236,10 @@ impl QuestDataLayer for DbQuestDataLayer {
                         WHERE stats_id = stats.id AND user_id = ?
                     )
                 ", user_id).execute(&self.db).await?;
+                // Set the user's lvl to 2
+                sqlx::query!("UPDATE users SET lvl = 2 WHERE id = ?", user_id)
+                    .execute(&self.db).await?;
             }
-
-            // If it was a monster battle, set the user's lvl to 2
-            sqlx::query!("UPDATE users SET lvl = 2 WHERE id = ?", user_id)
-                .execute(&self.db).await?;
         } else {
             // If it was a riddle quest, update the user as completed a riddle today
             sqlx::query!("UPDATE users SET riddle_quest_completed = TRUE WHERE id = ?", user_id)

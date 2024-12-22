@@ -15,7 +15,7 @@ impl Ai for WilfredAi {
             if monst_stats.power >= 2 { ATTACK_IDX }
             else { DEFEND_IDX }
         } else {
-            (dice::single(3) - 1) as i64
+            (dice::single(2) - 1) as i64
         }
     }
 }
@@ -23,9 +23,8 @@ impl Ai for WilfredAi {
 struct NutcrackerAi;
 impl Ai for NutcrackerAi {
     fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> i64 {
-        match dice::single(3) {
-            1 => IDLE_IDX,
-            2 => ATTACK_IDX,
+        match dice::single(2) {
+            1 => ATTACK_IDX,
             _ => DEFEND_IDX 
         }
     }
@@ -36,8 +35,7 @@ impl Ai for EvilChrisAi {
     fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> i64 {
         return if _monst_stats.health > 10 {
             match dice::single(4) {
-                1 => ATTACK_IDX,
-                2 => IDLE_IDX,
+                x if x == 1 || x == 2 => ATTACK_IDX,
                 _ => DEFEND_IDX
             }
         } else {
@@ -52,10 +50,9 @@ impl Ai for EvilChrisAi {
 struct HerbertAi;
 impl Ai for HerbertAi {
     fn next_act(&self, _pl_stats: &Stats, _monst_stats: &Stats) -> i64 {
-        match dice::single(3) {
-            1 => IDLE_IDX,
-            2 => ATTACK_IDX,
-            _ => DEFEND_IDX 
+        match dice::single(2) {
+            1 => DEFEND_IDX,
+            _ => ATTACK_IDX,
         }
     }
 }

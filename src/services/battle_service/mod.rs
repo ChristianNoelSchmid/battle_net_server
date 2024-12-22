@@ -1,10 +1,8 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use axum::async_trait;
 use derive_more::Constructor;
 use rand::{thread_rng, RngCore};
-use tokio::time::sleep;
 
 use crate::ai::AI;
 use crate::resources::game_resources::{Resources, Monster};
