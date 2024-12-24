@@ -65,7 +65,7 @@ async fn main() {
         // Cookies
         .layer(CookieManagerLayer::new());
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3005));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3005)); 
 
     // User background refresh stats service
     let sched = JobScheduler::new().await.unwrap();
