@@ -1,7 +1,6 @@
 
 use std::collections::HashSet;
 use axum::async_trait;
-use chrono::{Datelike, Utc};
 use derive_more::Constructor;
 use rand::{seq::IteratorRandom, rngs::StdRng, SeedableRng};
 use sqlx::SqlitePool;
@@ -88,40 +87,36 @@ impl QuestDataLayer for DbQuestDataLayer {
     async fn get_active_user_quest(&self, user_id: i64) -> Result<Option<QuestStateEntity>> {
         // Get the most recent, incomplete quest for the user (if one exists)
         let quest = sqlx::query!("
-            SELECT id, created_on, quest_type, completed FROM quests 
-            WHERE user_id = ? AND completed = FALSE ORDER BY created_on DESC
+            SELECT id, quest_type, completed FROM quests 
+            WHERE user_id = ? AND completed = FALSE
+            ORDER BY created_on DESC
             ", user_id
         ).fetch_optional(&self.db).await?;
 
         if let Some(quest) = quest {
-            // Check if the quest is from today - if not, return None. Otherwise, return the quest
-            let today = Utc::now().naive_utc();
-            if quest.created_on.num_days_from_ce() == today.num_days_from_ce() {
-
-                // Get the monster state for the quest if it's a monster quest
-                let monster_state = sqlx::query!("
-                    SELECT ms.monster_idx, ms.stats_id, s.health, s.power, s.armor, s.missing_next_turn 
-                    FROM monster_states ms JOIN stats s ON ms.stats_id = s.id
-                    WHERE quest_id = ?
-                    ", quest.id
-                )
-                    .fetch_optional(&self.db).await?
-                    .and_then(|row| Some(QuestMonsterEntity {
-                        monster_idx: row.monster_idx,
-                        stats: Stats::new(row.health, row.power, row.armor, row.missing_next_turn)
-                    }));
-
-                // Get the riddle idx for the quest if it's a riddle quest
-                let riddle_idx = sqlx::query!("SELECT riddle_idx FROM quest_riddles WHERE quest_id = ?", quest.id)
-                    .fetch_optional(&self.db).await?
-                    .and_then(|row| Some(row.riddle_idx));
-
-                return Ok(Some(QuestStateEntity { 
-                    id: quest.id, quest_type: quest.quest_type,
-                    monster_state, riddle_idx,
-                    completed: quest.completed
+            // Get the monster state for the quest if it's a monster quest
+            let monster_state = sqlx::query!("
+                SELECT ms.monster_idx, ms.stats_id, s.health, s.power, s.armor, s.missing_next_turn 
+                FROM monster_states ms JOIN stats s ON ms.stats_id = s.id
+                WHERE quest_id = ?
+                ", quest.id
+            )
+                .fetch_optional(&self.db).await?
+                .and_then(|row| Some(QuestMonsterEntity {
+                    monster_idx: row.monster_idx,
+                    stats: Stats::new(row.health, row.power, row.armor, row.missing_next_turn)
                 }));
-            }
+
+            // Get the riddle idx for the quest if it's a riddle quest
+            let riddle_idx = sqlx::query!("SELECT riddle_idx FROM quest_riddles WHERE quest_id = ?", quest.id)
+                .fetch_optional(&self.db).await?
+                .and_then(|row| Some(row.riddle_idx));
+
+            return Ok(Some(QuestStateEntity { 
+                id: quest.id, quest_type: quest.quest_type,
+                monster_state, riddle_idx,
+                completed: quest.completed
+            }));
         }
 
         Ok(None)
@@ -215,7 +210,10 @@ impl QuestDataLayer for DbQuestDataLayer {
             "SELECT id, quest_type FROM quests WHERE user_id = ? AND completed = FALSE", 
             user_id
         )  
-            .fetch_one(&self.db).await?;
+            .fetch_optional(&self.db).await?;
+
+        if quest.is_none() { return Ok(()); }
+        let quest = quest.unwrap();
 
         // Update the quest as completed
         sqlx::query!("UPDATE quests SET completed = TRUE WHERE id = ?", quest.id)

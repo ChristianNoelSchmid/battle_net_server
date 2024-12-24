@@ -51,6 +51,10 @@ impl DataLayer for DbDataLayer {
         sqlx::query!("UPDATE users SET lvl = 1, exhausted = FALSE, riddle_quest_completed = FALSE, guessed_today = FALSE")
             .execute(&self.db).await?;
 
+        // Complete all uncompleted quests
+        sqlx::query!("UPDATE quests SET completed = TRUE WHERE completed = FALSE")
+            .execute(&self.db).await?;
+
         // Update the game_state's last refresh time to now
         let utc_now = Utc::now().naive_utc();
         sqlx::query!("UPDATE game_states SET last_daily_refresh = ?", utc_now)
